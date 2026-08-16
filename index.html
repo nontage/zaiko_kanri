@@ -278,9 +278,8 @@
     <div class="brand">検品台帳</div>
     <div class="navgroup">
       <div class="navitem" data-nav="dashboard">ダッシュボード</div>
-      <div class="navitem" data-nav="all">すべての商品</div>
-      <div class="navitem" data-nav="today">ステータス</div>
-      <div class="navitem" data-nav="locations">保管場所</div>
+      <div class="navitem" data-nav="register">商品登録</div>
+      <div class="navitem" data-nav="all">在庫一覧</div>
     </div>
     <div class="navgroup">
       <div class="gt">作業</div>
@@ -293,7 +292,6 @@
     </div>
     <div class="navgroup">
       <div class="gt">設定/データ</div>
-      <div class="navitem" data-nav="import">インポート</div>
       <div class="navitem" data-nav="backup">バックアップ</div>
     </div>
   </nav>
@@ -382,30 +380,14 @@
       <div class="loc-row" id="locRow"></div>
     </div>
 
-    <p class="section-title" id="listTitle">すべての商品</p>
+    <p class="section-title" id="listTitle">在庫一覧</p>
 
     <div class="filter-bar">
       <textarea id="searchBox" rows="1" placeholder="コードで検索(複数可: カンマ・スペース・改行区切り)"></textarea>
-      <select id="filterLoc"><option value="all">保管場所: すべて</option></select>
-      <select id="filterPhoto">
-        <option value="all">撮影: すべて</option>
-        <option value="not_taken">未撮影</option>
-        <option value="taken">撮影済</option>
-        <option value="reshoot">再撮影</option>
-      </select>
-      <select id="filterImage">
-        <option value="all">画像: すべて</option>
-        <option value="none">画像なし</option>
-        <option value="waiting">加工待ち</option>
-        <option value="processing">加工中</option>
-        <option value="done">完成</option>
-      </select>
-      <select id="filterListing">
-        <option value="all">出品: すべて</option>
-        <option value="not_listed">未出品</option>
-        <option value="draft_pending">下書き待ち</option>
-        <option value="draft_done">下書き済</option>
-        <option value="listed">出品済</option>
+      <select id="sortSelect">
+        <option value="code">並び替え: コード順</option>
+        <option value="location">並び替え: 保管場所順</option>
+        <option value="next">並び替え: 次の作業順</option>
       </select>
     </div>
     <div class="chip-row" id="quickChipRow"></div>
@@ -433,9 +415,9 @@
     </div>
     <div id="itemList" class="board"></div>
 
-    <details class="section" id="backupSection">
-      <summary>バックアップ</summary>
-      <div class="body">
+    <div id="backupSection" class="panel section" style="display:none;">
+      <p class="panel-label">バックアップ</p>
+      <div class="body" style="border-top:none; padding:0;">
         <p class="hint">ブラウザのデータが消えないよう、こまめにJSONへバックアップしてください。</p>
         <div class="row">
           <button id="backupBtn">JSONバックアップ</button>
@@ -444,7 +426,7 @@
         </div>
         <p class="hint" id="backupNote" style="margin-top:8px; margin-bottom:0;"></p>
       </div>
-    </details>
+    </div>
 
     <footer>検品台帳 v2 — LOCAL STORAGE / NO SERVER</footer>
   </div>
@@ -452,9 +434,8 @@
 
 <div id="bottomnav">
   <button data-nav="dashboard">ダッシュボード</button>
-  <button data-nav="all">商品</button>
-  <button data-nav="today">ステータス</button>
-  <button data-nav="locations">場所</button>
+  <button data-nav="register">商品登録</button>
+  <button data-nav="all">在庫一覧</button>
 </div>
 
 <div id="overlay"></div>
@@ -559,6 +540,8 @@
   var currentView = 'dashboard';
   var lastDeleted = null;
   var stagingCodes = [];
+  var STAGING_KEY = 'inventory-app-staging-v2';
+  function saveStaging(){ try{ localStorage.setItem(STAGING_KEY, JSON.stringify(stagingCodes)); }catch(e){} }
   var saveTimer = null;
 
   var LOCS = ['C1','C2','C3','C4','C5','H1','H2'];
@@ -726,7 +709,11 @@
     Object.keys(data).forEach(function(c){ ensure(c); }); // fill defaults for any partial records
     repairAll();
     saveRaw();
-    renderAll();
+    try{
+      var stagingRaw = localStorage.getItem(STAGING_KEY);
+      if(stagingRaw) stagingCodes = JSON.parse(stagingRaw).filter(function(c){ return !!data[c]; });
+    }catch(e){ stagingCodes = []; }
+    setView('dashboard');
   }
 
   // ---------- state machine ----------
@@ -813,51 +800,43 @@
   }
 
   // ---------- filter state helpers ----------
-  var filterLoc = document.getElementById('filterLoc');
-  var filterPhoto = document.getElementById('filterPhoto');
-  var filterImage = document.getElementById('filterImage');
-  var filterListing = document.getElementById('filterListing');
 
+  var locFilter = 'all';
   function refreshLocOptions(){
-    var codes = Object.keys(data);
-    var locs = {};
-    codes.forEach(function(c){ if(data[c].location) locs[data[c].location] = true; });
-    var all = LOCS.concat(Object.keys(locs).filter(function(l){ return LOCS.indexOf(l) === -1; }));
-    var current = filterLoc.value;
-    filterLoc.innerHTML = '<option value="all">保管場所: すべて</option>';
-    all.forEach(function(l){
-      var o = document.createElement('option'); o.value = l; o.textContent = l;
-      filterLoc.appendChild(o);
-    });
-    if([].slice.call(filterLoc.options).some(function(o){ return o.value === current; })) filterLoc.value = current;
+    if(locFilter !== 'all' && !Object.keys(data).some(function(c){ return data[c].location === locFilter; })){
+      locFilter = 'all';
+    }
   }
 
+  var NEXT_ORDER = { reshoot:0, photo:1, image:2, draft:3, listing:4, trefac:5, done:6 };
   function getVisibleCodes(){
     var codes = Object.keys(data).sort();
     var searchTerms = document.getElementById('searchBox').value.split(/[,\s]+/).map(function(s){ return s.trim().toLowerCase(); }).filter(Boolean);
-    var loc = filterLoc.value, photo = filterPhoto.value, image = filterImage.value, listing = filterListing.value;
 
-    return codes.filter(function(code){
+    var visible = codes.filter(function(code){
       var it = data[code];
       if(searchTerms.length && !searchTerms.some(function(t){ return code.toLowerCase().indexOf(t) !== -1; })) return false;
-      if(loc !== 'all' && it.location !== loc) return false;
-      if(photo !== 'all'){
-        var pb = photoBadge(it);
-        var pk = it.needsReshoot ? 'reshoot' : it.photoStatus;
-        if(pk !== photo) return false;
-      }
-      if(image !== 'all'){
-        var ik = it.photoStatus !== 'taken' ? 'none' : it.imageStatus;
-        if(ik !== image) return false;
-      }
-      if(listing !== 'all'){
-        var lb = listingBadge(it);
-        var lk = it.listingStatus === 'listed' ? 'listed' : (it.draftDone ? 'draft_done' : ((it.photoStatus==='taken'&&it.imageStatus==='done') ? 'draft_pending' : 'not_listed'));
-        if(lk !== listing) return false;
-      }
+      if(locFilter !== 'all' && it.location !== locFilter) return false;
       if(quickFilter && !matchesQuick(it, quickFilter)) return false;
       return true;
     });
+
+    var sortMode = document.getElementById('sortSelect') ? document.getElementById('sortSelect').value : 'code';
+    if(sortMode === 'location'){
+      visible.sort(function(a,b){
+        var la = data[a].location || '\uFFFF', lb = data[b].location || '\uFFFF';
+        if(la !== lb) return la < lb ? -1 : 1;
+        return a < b ? -1 : 1;
+      });
+    } else if(sortMode === 'next'){
+      visible.sort(function(a,b){
+        var na = NEXT_ORDER[computeNextAction(data[a]).key];
+        var nb = NEXT_ORDER[computeNextAction(data[b]).key];
+        if(na !== nb) return na - nb;
+        return a < b ? -1 : 1;
+      });
+    }
+    return visible;
   }
 
   // ---------- rendering ----------
@@ -929,10 +908,10 @@
     locKeys.forEach(function(l){
       var n = c.byLoc[l] || 0;
       var el = document.createElement('div');
-      el.className = 'loc-card' + (filterLoc.value === l ? ' active' : '');
+      el.className = 'loc-card' + (locFilter === l ? ' active' : '');
       el.innerHTML = '<div class="code">' + l + '</div><div class="n">' + n + '件</div>';
       el.addEventListener('click', function(){
-        filterLoc.value = (filterLoc.value === l) ? 'all' : l;
+        locFilter = (locFilter === l) ? 'all' : l;
         renderAll();
         document.getElementById('itemList').scrollIntoView({ behavior:'smooth', block:'start' });
       });
@@ -964,10 +943,7 @@
     var listEl = document.getElementById('itemList');
     listEl.innerHTML = '';
 
-    document.getElementById('listTitle').textContent =
-      currentView === 'today' ? 'ステータス — 対象商品' :
-      currentView === 'locations' ? '保管場所別 — 対象商品' :
-      'すべての商品';
+    document.getElementById('listTitle').textContent = '在庫一覧';
 
     if(visible.length === 0){
       var empty = document.createElement('div');
@@ -1081,6 +1057,7 @@
 
   function renderStaging(){
     stagingCodes = stagingCodes.filter(function(c){ return !!data[c]; });
+    saveStaging();
     var area = document.getElementById('stagingArea');
     if(stagingCodes.length === 0){ area.style.display = 'none'; return; }
     area.style.display = '';
@@ -1118,6 +1095,7 @@
   }
   document.getElementById('stagingCloseBtn').addEventListener('click', function(){
     stagingCodes = [];
+    saveStaging();
     renderStaging();
   });
   document.getElementById('stagingBar').addEventListener('click', function(e){
@@ -1163,14 +1141,15 @@
   // ---------- view switching ----------
   function setView(view){
     currentView = view;
+    var showRegister = (view === 'register');
     var showDash = (view === 'dashboard');
-    var showToday = (view === 'dashboard' || view === 'today');
-    var showLoc = (view === 'dashboard' || view === 'locations');
+    var showBackup = (view === 'backup');
+    document.getElementById('importSection').style.display = showRegister ? '' : 'none';
     document.getElementById('dashSection').style.display = showDash ? '' : 'none';
-    document.getElementById('todaySection').style.display = showToday ? '' : 'none';
-    document.getElementById('locSection').style.display = showLoc ? '' : 'none';
-    if(view === 'import'){ document.getElementById('importSection').scrollIntoView({behavior:'smooth'}); }
-    if(view === 'backup'){ document.getElementById('backupSection').open = true; document.getElementById('backupSection').scrollIntoView({behavior:'smooth'}); }
+    document.getElementById('todaySection').style.display = showDash ? '' : 'none';
+    document.getElementById('locSection').style.display = showDash ? '' : 'none';
+    document.getElementById('backupSection').style.display = showBackup ? '' : 'none';
+    if(showBackup){ document.getElementById('backupSection').scrollIntoView({behavior:'smooth'}); }
     if(view === 'all'){ quickFilter = null; }
     renderAll();
   }
@@ -1178,11 +1157,12 @@
     el.addEventListener('click', function(){ setView(el.getAttribute('data-nav')); });
   });
   document.querySelectorAll('[data-quick]').forEach(function(el){
-    el.addEventListener('click', function(){ currentView = 'today'; setQuickFilter(el.getAttribute('data-quick')); });
+    el.addEventListener('click', function(){ setView('all'); setQuickFilter(el.getAttribute('data-quick')); });
   });
 
   // ---------- import / bulk-apply ----------
   document.getElementById('addToggleBtn').addEventListener('click', function(){
+    setView('register');
     document.getElementById('importSection').scrollIntoView({ behavior:'smooth', block:'start' });
     document.getElementById('importArea').focus();
   });
@@ -1193,12 +1173,13 @@
     codes.forEach(function(c){ ensure(c); });
     document.getElementById('importArea').value = '';
     stagingCodes = codes.slice();
+    saveStaging();
     save(); renderAll(); renderStaging();
   });
   document.getElementById('clearBtn').addEventListener('click', function(){
     appConfirm('全ての商品データを削除します。よろしいですか?', '全件削除').then(function(ok){
       if(!ok) return;
-      data = {}; selected = {}; save(); renderAll();
+      data = {}; selected = {}; stagingCodes = []; saveStaging(); save(); renderAll();
     });
   });
 
@@ -1274,6 +1255,7 @@
       var newCodes = [];
       rows.forEach(function(r){ if(applyCsvRow(r)){ count++; newCodes.push((r[0]||'').trim()); } });
       stagingCodes = newCodes;
+      saveStaging();
       save(); renderAll(); renderStaging();
       document.getElementById('backupNote').textContent = 'CSVから' + count + '件を取り込みました。';
     };
@@ -1330,10 +1312,8 @@
   });
 
   // ---------- filters ----------
-  [document.getElementById('searchBox'), filterLoc, filterPhoto, filterImage, filterListing].forEach(function(el){
-    el.addEventListener('input', renderList);
-    el.addEventListener('change', renderAll);
-  });
+  document.getElementById('searchBox').addEventListener('input', renderList);
+  document.getElementById('sortSelect').addEventListener('change', renderList);
 
   // ---------- bulk actions ----------
   document.getElementById('bulkbar').addEventListener('click', function(e){

@@ -50,8 +50,8 @@
   #sidebar .navgroup{ margin-bottom: 16px; }
   #sidebar .navgroup .gt{
     font-family: var(--mono); font-size: 10px; color: var(--ink-faint); letter-spacing: 0.1em; text-transform: uppercase;
-    padding: 8px 8px 6px; margin-top: 6px; border-top: 1px solid var(--line-strong);
-    background: var(--paper); cursor: default; pointer-events: none;
+    padding: 8px; margin-top: 10px; border-top: 1px solid var(--line-strong);
+    background: var(--paper); border-radius: var(--radius-sm); cursor: default; pointer-events: none;
   }
   #sidebar .navitem{
     display:flex; align-items:center; justify-content:space-between; gap:8px;
@@ -912,7 +912,7 @@
     QUICK_CHIPS.forEach(function(t){
       var el = document.createElement('button');
       el.className = 'qchip tone-' + t.tone + (quickFilter === t.key ? ' active' : '');
-      el.textContent = t.label;
+      el.textContent = t.label + ' (' + (c[t.key] || 0) + ')';
       el.addEventListener('click', function(){ setQuickFilter(t.key); });
       chipRow.appendChild(el);
     });
@@ -1286,7 +1286,11 @@
 
   // ---------- filters ----------
   document.getElementById('searchBox').addEventListener('input', renderList);
-  document.getElementById('sortSelect').addEventListener('change', renderList);
+  document.getElementById('sortSelect').addEventListener('change', function(){
+    var y = window.scrollY;
+    renderList();
+    window.scrollTo(0, y);
+  });
 
   // ---------- bulk actions ----------
   document.getElementById('bulkbar').addEventListener('click', function(e){

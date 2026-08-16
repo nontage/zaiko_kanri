@@ -118,6 +118,11 @@
   .today-chip:hover{ border-color: var(--line-strong); }
   .today-chip.active{ border-color: var(--ink); background: var(--ink); color:#fff; }
   .today-chip .n{ font-family: var(--mono); font-weight: 700; }
+  .today-chip.tone-coral{ border-left: 4px solid var(--coral); }
+  .today-chip.tone-amber{ border-left: 4px solid var(--amber); }
+  .today-chip.tone-teal{ border-left: 4px solid var(--teal); }
+  .today-chip.tone-slate{ border-left: 4px solid var(--slate); }
+  .today-chip.active.tone-coral, .today-chip.active.tone-amber, .today-chip.active.tone-teal, .today-chip.active.tone-slate{ border-left-color: #fff; }
 
   .loc-row{ display:grid; grid-template-columns: repeat(auto-fit, minmax(100px,1fr)); gap:8px; margin-bottom: 22px; }
   .loc-card{ background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; cursor:pointer; text-align:center; }
@@ -134,7 +139,7 @@
   details.section > summary::-webkit-details-marker{ display:none; }
   details.section > summary::before{ content: "▸"; color: var(--ink-faint); font-size: 11px; }
   details.section[open] > summary::before{ content: "▾"; }
-  details.section .body{ padding: 0 16px 16px; border-top: 1px solid var(--line); padding-top: 14px; }
+  details.section .body, div.section .body{ padding: 0 16px 16px; border-top: 1px solid var(--line); padding-top: 14px; }
   .hint{ font-size: 12px; color: var(--ink-soft); margin: 0 0 10px; line-height: 1.6; }
   .row{ display:flex; gap:8px; flex-wrap:wrap; }
   .row > *{ flex:1; min-width: 130px; }
@@ -146,6 +151,11 @@
   .chip-row{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom: 12px; }
   .qchip{ font-size: 11.5px; padding: 5px 11px; border-radius:999px; border:1px solid var(--line-strong); background:var(--panel); cursor:pointer; }
   .qchip.active{ background: var(--ink); color:#fff; border-color: var(--ink); }
+  .qchip.tone-coral{ color: var(--coral-ink); border-color: var(--coral); }
+  .qchip.tone-amber{ color: var(--amber-ink); border-color: var(--amber); }
+  .qchip.tone-teal{ color: var(--teal-ink); border-color: var(--teal); }
+  .qchip.tone-slate{ color: var(--slate-ink); border-color: var(--slate); }
+  .qchip.active.tone-coral, .qchip.active.tone-amber, .qchip.active.tone-teal, .qchip.active.tone-slate{ color:#fff; }
 
   /* ---- bulk bar ---- */
   .bulkbar{ display:none; align-items:center; gap:7px; flex-wrap:wrap; background: var(--ink); color:#fff; border-radius: var(--radius); padding: 9px 12px; margin-bottom: 10px; }
@@ -177,6 +187,11 @@
   .item-row .loc{ font-family: var(--mono); font-size: 12px; color: var(--ink-soft); }
   .next-action{ display:flex; align-items:center; gap:6px; font-size: 12.5px; font-weight: 700; }
   .next-action.done{ color: var(--ink-faint); font-weight: 400; }
+  .next-action.tone-coral{ color: var(--coral-ink); }
+  .next-action.tone-amber{ color: var(--amber-ink); }
+  .next-action.tone-teal{ color: var(--teal-ink); }
+  .next-action.tone-slate{ color: var(--slate-ink); }
+  .next-action.done.tone-coral, .next-action.done.tone-amber, .next-action.done.tone-teal, .next-action.done.tone-slate{ color: var(--ink-faint); }
   .row-actions{ display:flex; gap:6px; align-items:center; justify-content:flex-end; }
   .menu-wrap{ position:relative; }
   .menu-dd{ display:none; position:absolute; right:0; top: 100%; margin-top:4px; background:#fff; border:1px solid var(--line-strong); border-radius: var(--radius-sm); box-shadow: 0 6px 18px rgba(0,0,0,0.1); min-width: 120px; z-index: 20; overflow:hidden; }
@@ -279,7 +294,6 @@
     <div class="navgroup">
       <div class="gt">設定/データ</div>
       <div class="navitem" data-nav="import">インポート</div>
-      <div class="navitem" data-nav="sheet">スプレッドシート連携</div>
       <div class="navitem" data-nav="backup">バックアップ</div>
     </div>
   </nav>
@@ -294,9 +308,9 @@
       </div>
     </div>
 
-    <details class="section" id="importSection">
-      <summary>商品を追加</summary>
-      <div class="body">
+    <div class="panel section" id="importSection">
+      <p class="panel-label">商品を追加</p>
+      <div class="body" style="border-top:none; padding:0;">
         <p class="hint">A列のコードを改行・カンマ区切りで貼り付けてください。属性は取り込んだ後、一覧や詳細パネルで設定します。</p>
         <textarea id="importArea" rows="3" placeholder="to3966&#10;to4123&#10;bt1272"></textarea>
         <div class="row" style="margin-top:8px;">
@@ -331,15 +345,19 @@
           </div>
         </details>
       </div>
-    </details>
+    </div>
 
-    <div id="dashboardView">
+    <div id="dashSection">
       <p class="section-title">ダッシュボード</p>
       <div class="dash-grid" id="dashGrid"></div>
+    </div>
 
+    <div id="todaySection">
       <p class="section-title">今日やること <span class="muted">クリックで絞り込み</span></p>
       <div class="today-row" id="todayRow"></div>
+    </div>
 
+    <div id="locSection">
       <p class="section-title">保管場所 <span class="muted">クリックで絞り込み</span></p>
       <div class="loc-row" id="locRow"></div>
     </div>
@@ -395,18 +413,6 @@
     </div>
     <div id="itemList" class="board"></div>
 
-    <details class="section" id="sheetSection" style="margin-top:22px;">
-      <summary>スプレッドシート連携(E〜M列書き出し)</summary>
-      <div class="body">
-        <p class="hint">スプレッドシートのE〜M列と互換性のある形式です。「スプレッドシート用にコピー」でタブ区切りのフルデータをコピーできます。</p>
-        <div class="row" style="margin-bottom:14px;">
-          <button class="primary" id="copyForSheetBtn">スプレッドシート用にコピー</button>
-          <button id="csvBtn">CSV保存</button>
-        </div>
-        <div class="export-grid" id="exportGrid"></div>
-      </div>
-    </details>
-
     <details class="section" id="backupSection">
       <summary>バックアップ</summary>
       <div class="body">
@@ -425,10 +431,10 @@
 </div>
 
 <div id="bottomnav">
-  <button data-nav="dashboard">📊 ダッシュボード</button>
-  <button data-nav="all">📦 商品</button>
-  <button data-nav="today">✅ 今日</button>
-  <button data-nav="locations">📍 場所</button>
+  <button data-nav="dashboard">ダッシュボード</button>
+  <button data-nav="all">商品</button>
+  <button data-nav="today">今日</button>
+  <button data-nav="locations">場所</button>
 </div>
 
 <div id="overlay"></div>
@@ -704,14 +710,14 @@
 
   // ---------- state machine ----------
   function computeNextAction(it){
-    if(it.listingStatus === 'listed') return { key:'done', label:'完了', emoji:'✅', advanceLabel:null };
-    if(it.listingStatus === 'trefac_sold') return { key:'done', label:'完了(トレファク)', emoji:'✅', advanceLabel:null };
-    if(it.needsReshoot) return { key:'reshoot', label:'再撮影する', emoji:'🔄', advanceLabel:'再撮影完了' };
-    if(it.sellToTrefac) return { key:'trefac', label:'トレファクへ', emoji:'🏪', advanceLabel:'トレファク完了' };
-    if(it.photoStatus !== 'taken') return { key:'photo', label:'撮影する', emoji:'📷', advanceLabel:'撮影完了' };
-    if(it.imageStatus !== 'done') return { key:'image', label:'画像加工する', emoji:'🖼', advanceLabel:'加工完了' };
-    if(!it.draftDone) return { key:'draft', label:'下書きを書く', emoji:'✏️', advanceLabel:'下書き完了' };
-    return { key:'listing', label:'出品する', emoji:'🚀', advanceLabel:'出品完了' };
+    if(it.listingStatus === 'listed') return { key:'done', label:'完了', tone:'teal', advanceLabel:null };
+    if(it.listingStatus === 'trefac_sold') return { key:'done', label:'完了(トレファク)', tone:'teal', advanceLabel:null };
+    if(it.needsReshoot) return { key:'reshoot', label:'再撮影する', tone:'coral', advanceLabel:'再撮影完了' };
+    if(it.sellToTrefac) return { key:'trefac', label:'トレファクへ', tone:'slate', advanceLabel:'トレファク完了' };
+    if(it.photoStatus !== 'taken') return { key:'photo', label:'撮影する', tone:'coral', advanceLabel:'撮影完了' };
+    if(it.imageStatus !== 'done') return { key:'image', label:'画像加工する', tone:'amber', advanceLabel:'加工完了' };
+    if(!it.draftDone) return { key:'draft', label:'下書きを書く', tone:'amber', advanceLabel:'下書き完了' };
+    return { key:'listing', label:'出品する', tone:'teal', advanceLabel:'出品完了' };
   }
 
   function advance(it){
@@ -844,12 +850,12 @@
     { key:'trefac_pending', label:'トレファク行き', metric:function(c){ return c.trefac_pending; } }
   ];
   var TODAY_CATS = [
-    { key:'not_photo', label:'撮影', emoji:'📷' },
-    { key:'reshoot', label:'再撮影', emoji:'🔄' },
-    { key:'img_pending', label:'画像加工', emoji:'🖼' },
-    { key:'draft_pending', label:'下書き', emoji:'✏️' },
-    { key:'listing_pending', label:'出品', emoji:'🚀' },
-    { key:'trefac_pending', label:'トレファク', emoji:'🏪' }
+    { key:'not_photo', label:'撮影', tone:'coral' },
+    { key:'reshoot', label:'再撮影', tone:'coral' },
+    { key:'img_pending', label:'画像加工', tone:'amber' },
+    { key:'draft_pending', label:'下書き', tone:'amber' },
+    { key:'listing_pending', label:'出品', tone:'teal' },
+    { key:'trefac_pending', label:'トレファク', tone:'slate' }
   ];
   var QUICK_CHIPS = TODAY_CATS;
 
@@ -891,8 +897,8 @@
     TODAY_CATS.forEach(function(t){
       var n = c[t.key] || 0;
       var el = document.createElement('div');
-      el.className = 'today-chip' + (quickFilter === t.key ? ' active' : '');
-      el.innerHTML = '<span>' + t.emoji + ' ' + t.label + '</span><span class="n">' + n + '件</span>';
+      el.className = 'today-chip tone-' + t.tone + (quickFilter === t.key ? ' active' : '');
+      el.innerHTML = '<span>' + t.label + '</span><span class="n">' + n + '件</span>';
       el.addEventListener('click', function(){ setQuickFilter(t.key); });
       today.appendChild(el);
     });
@@ -917,8 +923,8 @@
     chipRow.innerHTML = '';
     QUICK_CHIPS.forEach(function(t){
       var el = document.createElement('button');
-      el.className = 'qchip' + (quickFilter === t.key ? ' active' : '');
-      el.textContent = t.emoji + ' ' + t.label;
+      el.className = 'qchip tone-' + t.tone + (quickFilter === t.key ? ' active' : '');
+      el.textContent = t.label;
       el.addEventListener('click', function(){ setQuickFilter(t.key); });
       chipRow.appendChild(el);
     });
@@ -982,8 +988,8 @@
       var lWrap = document.createElement('span'); lWrap.innerHTML = badgeHtml(lb); row.appendChild(lWrap);
 
       var naEl = document.createElement('div');
-      naEl.className = 'next-action' + (na.key === 'done' ? ' done' : '');
-      naEl.innerHTML = '<span>' + na.emoji + '</span><span>' + na.label + '</span>';
+      naEl.className = 'next-action tone-' + na.tone + (na.key === 'done' ? ' done' : '');
+      naEl.textContent = na.label;
       row.appendChild(naEl);
 
       var actWrap = document.createElement('div'); actWrap.className = 'row-actions';
@@ -1029,8 +1035,8 @@
       card.appendChild(badges);
 
       var bottom = document.createElement('div'); bottom.className = 'bottom';
-      var naM = document.createElement('div'); naM.className = 'next-action' + (na.key==='done'?' done':'');
-      naM.innerHTML = '<span>' + na.emoji + '</span><span>' + na.label + '</span>';
+      var naM = document.createElement('div'); naM.className = 'next-action tone-' + na.tone + (na.key==='done'?' done':'');
+      naM.textContent = na.label;
       bottom.appendChild(naM);
       if(na.advanceLabel){
         var advBtnM = document.createElement('button'); advBtnM.className = 'sm primary'; advBtnM.textContent = na.advanceLabel;
@@ -1060,55 +1066,24 @@
     renderList();
   });
 
-  function renderExport(){
-    var codes = Object.keys(data);
-    function grp(pred){ return codes.filter(function(c){ return pred(data[c]); }); }
-    var groups = [
-      { label:'画像あり', list: grp(function(it){ return it.photoStatus==='taken'; }) },
-      { label:'未出品', list: grp(function(it){ return it.listingStatus==='not_listed'; }) },
-      { label:'出品済み', list: grp(function(it){ return it.listingStatus==='listed'; }) },
-      { label:'未出品・画像あり', list: grp(function(it){ return it.listingStatus==='not_listed' && it.photoStatus==='taken'; }) },
-      { label:'未出品・画像なし', list: grp(function(it){ return it.listingStatus==='not_listed' && it.photoStatus!=='taken'; }) },
-      { label:'トレファクに売る', list: grp(function(it){ return it.sellToTrefac; }) },
-      { label:'画像加工中', list: grp(function(it){ return it.imageStatus==='processing'; }) },
-      { label:'再撮影', list: grp(function(it){ return it.needsReshoot; }) },
-      { label:'下書きを書く', list: grp(function(it){ return computeNextAction(it).key === 'draft'; }) }
-    ];
-    var grid = document.getElementById('exportGrid');
-    grid.innerHTML = '';
-    groups.forEach(function(g){
-      var card = document.createElement('div'); card.className = 'export-card';
-      var head = document.createElement('div'); head.className = 'head';
-      head.innerHTML = '<span class="name">' + g.label + ' <span class="count">(' + g.list.length + ')</span></span>';
-      var copyBtn = document.createElement('button'); copyBtn.className = 'sm'; copyBtn.textContent = 'コピー';
-      copyBtn.addEventListener('click', function(){
-        navigator.clipboard.writeText(g.list.join('\n')).then(function(){
-          copyBtn.textContent = '完了'; setTimeout(function(){ copyBtn.textContent = 'コピー'; }, 1200);
-        });
-      });
-      head.appendChild(copyBtn);
-      card.appendChild(head);
-      var ta = document.createElement('textarea'); ta.readOnly = true; ta.value = g.list.join('\n');
-      card.appendChild(ta);
-      grid.appendChild(card);
-    });
-  }
-
   function renderAll(){
     refreshLocOptions();
     var c = computeCounts();
     renderSidebarCounts(c);
     renderDash(c);
     renderList();
-    renderExport();
   }
 
   // ---------- view switching ----------
   function setView(view){
     currentView = view;
-    document.getElementById('dashboardView').style.display = (view === 'dashboard') ? '' : 'none';
-    if(view === 'import'){ document.getElementById('importSection').open = true; document.getElementById('importSection').scrollIntoView({behavior:'smooth'}); }
-    if(view === 'sheet'){ document.getElementById('sheetSection').open = true; document.getElementById('sheetSection').scrollIntoView({behavior:'smooth'}); }
+    var showDash = (view === 'dashboard');
+    var showToday = (view === 'dashboard' || view === 'today');
+    var showLoc = (view === 'dashboard' || view === 'locations');
+    document.getElementById('dashSection').style.display = showDash ? '' : 'none';
+    document.getElementById('todaySection').style.display = showToday ? '' : 'none';
+    document.getElementById('locSection').style.display = showLoc ? '' : 'none';
+    if(view === 'import'){ document.getElementById('importSection').scrollIntoView({behavior:'smooth'}); }
     if(view === 'backup'){ document.getElementById('backupSection').open = true; document.getElementById('backupSection').scrollIntoView({behavior:'smooth'}); }
     if(view === 'all'){ quickFilter = null; }
     renderAll();
@@ -1122,9 +1097,8 @@
 
   // ---------- import / bulk-apply ----------
   document.getElementById('addToggleBtn').addEventListener('click', function(){
-    var sec = document.getElementById('importSection');
-    sec.open = !sec.open;
-    if(sec.open) sec.scrollIntoView({ behavior:'smooth', block:'start' });
+    document.getElementById('importSection').scrollIntoView({ behavior:'smooth', block:'start' });
+    document.getElementById('importArea').focus();
   });
 
   document.getElementById('importBtn').addEventListener('click', function(){
@@ -1243,18 +1217,6 @@
     });
     return rows;
   }
-  document.getElementById('csvBtn').addEventListener('click', function(){
-    var rows = fullRows(Object.keys(data).sort());
-    var csv = rows.map(function(r){ return r.map(function(v){ return '"'+String(v).replace(/"/g,'""')+'"'; }).join(','); }).join('\r\n');
-    downloadFile('kenpin-daicho-'+timestamp()+'.csv', '\uFEFF'+csv, 'text/csv');
-  });
-  document.getElementById('copyForSheetBtn').addEventListener('click', function(){
-    var rows = fullRows(Object.keys(data).sort());
-    var tsv = rows.map(function(r){ return r.join('\t'); }).join('\n');
-    navigator.clipboard.writeText(tsv).then(function(){
-      document.getElementById('backupNote').textContent = '全' + Object.keys(data).length + '件をコピーしました。';
-    });
-  });
   document.getElementById('backupBtn').addEventListener('click', function(){
     downloadFile('kenpin-daicho-backup-'+timestamp()+'.json', JSON.stringify(data,null,2), 'application/json');
     document.getElementById('backupNote').textContent = 'バックアップしました: ' + new Date().toLocaleString('ja-JP');
@@ -1427,7 +1389,7 @@
     if(!drawerCode) return;
     var it = data[drawerCode];
     var na = computeNextAction(it);
-    document.getElementById('dNextLabel').textContent = na.emoji + ' ' + na.label;
+    document.getElementById('dNextLabel').textContent = na.label;
     document.getElementById('dAdvanceBtn').style.display = na.advanceLabel ? '' : 'none';
     document.getElementById('dAdvanceBtn').textContent = na.advanceLabel || '';
 

@@ -358,9 +358,9 @@
           </div>
           <div class="bulkbar active" id="stagingBar" style="background:var(--ink);">
             <button data-act="reshoot">再撮影</button>
-            <button data-act="photographed">撮影完了</button>
-            <button data-act="listed">出品完了</button>
+            <button data-act="listed">出品済みへ</button>
             <button data-act="trefac">トレファクへ</button>
+            <button data-act="sold">売却済へ</button>
             <select id="stagingLocSelect"></select>
             <button id="stagingLocApply">場所を適用</button>
           </div>
@@ -399,9 +399,9 @@
     <div class="bulkbar" id="bulkbar">
       <span class="count" id="bulkCount">0件選択中</span>
       <button data-act="reshoot">再撮影</button>
-      <button data-act="photographed">撮影完了</button>
-      <button data-act="listed">出品完了</button>
+      <button data-act="listed">出品済みへ</button>
       <button data-act="trefac">トレファクへ</button>
+      <button data-act="sold">売却済へ</button>
       <select id="bulkLocSelect"></select>
       <button id="bulkLocApply">場所を適用</button>
       <span class="spacer"></span>
@@ -455,11 +455,11 @@
     <div class="dlabel">ステータス</div>
     <div class="dbtns">
       <button class="sm" id="dStatusReshoot">再撮影</button>
-      <button class="sm" id="dStatusPhotographed">撮影</button>
+      <button class="sm" id="dStatusListed">出品済み</button>
     </div>
     <div class="dbtns" style="margin-top:6px;">
-      <button class="sm" id="dStatusListed">出品済み</button>
       <button class="sm" id="dStatusTrefac">トレファク</button>
+      <button class="sm" id="dStatusSold">売却済</button>
     </div>
   </div>
   <div class="dsection">
@@ -638,8 +638,7 @@
   function statusFromV1(o){
     if(o.listed === 'yes') return 'listed';
     if(o.sub === 'trefac') return 'trefac';
-    if(o.image === 'yes') return 'photographed';
-    return 'reshoot';
+    return 'reshoot'; // 「撮影済みだが出品前」の中間状態は廃止したため、未完了(再撮影)へ統合
   }
   function migrateFromV1(){
     var raw;
@@ -663,8 +662,7 @@
   function statusFromV2(o){
     if(o.listingStatus === 'listed') return 'listed';
     if(o.listingStatus === 'trefac_sold' || o.sellToTrefac) return 'trefac';
-    if(o.needsReshoot || o.photoStatus !== 'taken') return 'reshoot';
-    return 'photographed';
+    return 'reshoot'; // 「撮影済みだが出品前」の中間状態は廃止したため、未完了(再撮影)へ統合
   }
   function migrateFromV2(){
     var raw;
@@ -683,6 +681,16 @@
     return true;
   }
 
+  // 廃止した中間ステータス「photographed」が残っている場合は「reshoot」(未完了)へ統合する
+  function repairStatuses(){
+    Object.keys(data).forEach(function(code){
+      var it = data[code];
+      if(it.status !== 'reshoot' && it.status !== 'listed' && it.status !== 'trefac' && it.status !== 'sold'){
+        it.status = 'reshoot';
+      }
+    });
+  }
+
   function load(){
     var raw;
     try{ raw = localStorage.getItem(NEW_KEY); }catch(e){ raw = null; }
@@ -692,6 +700,7 @@
       migrateFromV1();
     }
     Object.keys(data).forEach(function(c){ ensure(c); }); // fill defaults for any partial records
+    repairStatuses();
     saveRaw();
     try{
       var stagingRaw = localStorage.getItem(STAGING_KEY);
@@ -701,25 +710,26 @@
   }
 
   // ---------- state machine ----------
-  // status: 'reshoot'(写真なし・撮影が必要) | 'photographed'(写真あり・出品前) | 'listed'(出品済み・完了) | 'trefac'(トレファク行き・完了)
+  // status: 'reshoot'(未完了・撮影が必要) | 'listed'(出品済み・完了) | 'trefac'(トレファク・完了) | 'sold'(売却済・完了)
+  var DONE_STATUSES = ['listed', 'trefac', 'sold'];
   function computeNextAction(it){
-    if(it.status === 'listed') return { key:'done', label:'完了', tone:'teal', advanceLabel:null };
-    if(it.status === 'trefac') return { key:'done', label:'完了(トレファク)', tone:'teal', advanceLabel:null };
-    if(it.status === 'reshoot') return { key:'reshoot', label:'撮影する', tone:'coral', advanceLabel:'撮影完了' };
-    return { key:'listing', label:'出品する', tone:'teal', advanceLabel:'出品完了' };
+    if(DONE_STATUSES.indexOf(it.status) !== -1){
+      var doneLabel = it.status === 'listed' ? '完了(出品済み)' : it.status === 'trefac' ? '完了(トレファク)' : '完了(売却済)';
+      return { key:'done', label:doneLabel, tone:'teal', advanceLabel:null };
+    }
+    return { key:'reshoot', label:'対応が必要(再撮影)', tone:'coral', advanceLabel:null };
   }
 
   function advance(it){
-    if(it.status === 'reshoot') it.status = 'photographed';
-    else if(it.status === 'photographed') it.status = 'listed';
+    // 単一の「次へ」進行はない(再撮影→出品済み/トレファク/売却済のいずれかを選ぶ形のため)
   }
 
   function statusBadge(it){
     switch(it.status){
       case 'reshoot': return { label:'再撮影', tone:'coral' };
-      case 'photographed': return { label:'撮影', tone:'amber' };
       case 'listed': return { label:'出品済み', tone:'teal' };
       case 'trefac': return { label:'トレファク', tone:'slate' };
+      case 'sold': return { label:'売却済', tone:'amber' };
       default: return { label:'再撮影', tone:'coral' };
     }
   }
@@ -731,7 +741,7 @@
 
   function computeCounts(){
     var codes = Object.keys(data);
-    var c = { total: codes.length, reshoot:0, photographed:0, listed:0, trefac:0, byLoc:{} };
+    var c = { total: codes.length, reshoot:0, listed:0, trefac:0, sold:0, byLoc:{} };
     LOCS.forEach(function(l){ c.byLoc[l] = 0; });
     codes.forEach(function(code){
       var it = data[code];
@@ -751,7 +761,7 @@
     }
   }
 
-  var NEXT_ORDER = { reshoot:0, listing:1, done:2 };
+  var NEXT_ORDER = { reshoot:0, done:1 };
   function getVisibleCodes(){
     var codes = Object.keys(data).sort();
     var searchTerms = document.getElementById('searchBox').value.split(/[,\s]+/).map(function(s){ return s.trim().toLowerCase(); }).filter(Boolean);
@@ -785,15 +795,15 @@
   // ---------- rendering ----------
   var STAGE_ORDER = [
     { key:'reshoot', qkey:'reshoot', label:'再撮影', tone:'coral' },
-    { key:'photographed', qkey:'photographed', label:'撮影(出品前)', tone:'amber' },
     { key:'listed', qkey:'listed', label:'出品済み', tone:'teal' },
-    { key:'trefac', qkey:'trefac', label:'トレファク', tone:'slate' }
+    { key:'trefac', qkey:'trefac', label:'トレファク', tone:'slate' },
+    { key:'sold', qkey:'sold', label:'売却済', tone:'amber' }
   ];
   var TODAY_CATS = [
     { key:'reshoot', label:'再撮影', tone:'coral' },
-    { key:'photographed', label:'撮影(出品待ち)', tone:'amber' },
     { key:'listed', label:'出品済み', tone:'teal' },
-    { key:'trefac', label:'トレファク', tone:'slate' }
+    { key:'trefac', label:'トレファク', tone:'slate' },
+    { key:'sold', label:'売却済', tone:'amber' }
   ];
   var QUICK_CHIPS = TODAY_CATS;
 
@@ -820,7 +830,7 @@
   }
 
   function computeStageBuckets(){
-    var buckets = { reshoot:0, photographed:0, listed:0, trefac:0 };
+    var buckets = { reshoot:0, listed:0, trefac:0, sold:0 };
     Object.keys(data).forEach(function(code){
       var st = data[code].status;
       if(buckets[st] === undefined) st = 'reshoot';
@@ -840,7 +850,7 @@
     totalWrap.innerHTML = '<span class="n">' + total + '</span><span class="l">総在庫</span>';
     top.appendChild(totalWrap);
     var sub = document.createElement('div'); sub.className = 'hero-sub';
-    sub.textContent = total > 0 ? Math.round(((buckets.listed + buckets.trefac) / total) * 100) + '% 完了' : '';
+    sub.textContent = total > 0 ? Math.round(((buckets.listed + buckets.trefac + buckets.sold) / total) * 100) + '% 完了' : '';
     top.appendChild(sub);
     hero.appendChild(top);
 
@@ -1107,7 +1117,7 @@
     var act = btn.getAttribute('data-act');
     stagingCodes.forEach(function(code){
       var it = ensure(code);
-      if(act === 'reshoot' || act === 'photographed' || act === 'listed' || act === 'trefac') it.status = act;
+      if(act === 'reshoot' || act === 'listed' || act === 'trefac' || act === 'sold') it.status = act;
     });
     save(); renderAll(); renderStaging();
   });
@@ -1207,9 +1217,9 @@
     var statusVal = (cols[2]||'').trim();
     if(locVal) it.location = locVal;
     if(statusVal === '再撮影') it.status = 'reshoot';
-    else if(statusVal === '撮影') it.status = 'photographed';
     else if(statusVal === '出品済み') it.status = 'listed';
     else if(statusVal === 'トレファク') it.status = 'trefac';
+    else if(statusVal === '売却済') it.status = 'sold';
     return true;
   }
   document.getElementById('csvImportLabel').addEventListener('click', function(){ document.getElementById('csvImportFile').click(); });
@@ -1218,7 +1228,8 @@
     var sample = [
       ['to3966','C1','出品済み'],
       ['to4123','C2','再撮影'],
-      ['bt1272','C3','撮影']
+      ['bt1272','C3','トレファク'],
+      ['bt1016','C4','売却済']
     ];
     var rows = [header].concat(sample);
     var csv = rows.map(function(r){
@@ -1299,7 +1310,7 @@
     var act = btn.getAttribute('data-act');
     Object.keys(selected).forEach(function(code){
       var it = ensure(code);
-      if(act === 'reshoot' || act === 'photographed' || act === 'listed' || act === 'trefac') it.status = act;
+      if(act === 'reshoot' || act === 'listed' || act === 'trefac' || act === 'sold') it.status = act;
     });
     save(); renderAll();
   });
@@ -1430,9 +1441,9 @@
     document.getElementById('dAdvanceBtn').textContent = na.advanceLabel || '';
 
     setActiveBtn('dStatusReshoot', it.status === 'reshoot');
-    setActiveBtn('dStatusPhotographed', it.status === 'photographed');
     setActiveBtn('dStatusListed', it.status === 'listed');
     setActiveBtn('dStatusTrefac', it.status === 'trefac');
+    setActiveBtn('dStatusSold', it.status === 'sold');
   }
   function setActiveBtn(id, on){
     var el = document.getElementById(id);
@@ -1462,9 +1473,9 @@
     save(); renderAll(); openDrawer(drawerCode);
   });
   document.getElementById('dStatusReshoot').addEventListener('click', function(){ if(!drawerCode) return; data[drawerCode].status='reshoot'; save(); renderAll(); refreshDrawerState(); });
-  document.getElementById('dStatusPhotographed').addEventListener('click', function(){ if(!drawerCode) return; data[drawerCode].status='photographed'; save(); renderAll(); refreshDrawerState(); });
   document.getElementById('dStatusListed').addEventListener('click', function(){ if(!drawerCode) return; data[drawerCode].status='listed'; save(); renderAll(); refreshDrawerState(); });
   document.getElementById('dStatusTrefac').addEventListener('click', function(){ if(!drawerCode) return; data[drawerCode].status='trefac'; save(); renderAll(); refreshDrawerState(); });
+  document.getElementById('dStatusSold').addEventListener('click', function(){ if(!drawerCode) return; data[drawerCode].status='sold'; save(); renderAll(); refreshDrawerState(); });
   document.getElementById('dDeleteBtn').addEventListener('click', function(){
     if(!drawerCode) return;
     var code = drawerCode;

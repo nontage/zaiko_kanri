@@ -1,0 +1,1493 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>検品台帳 — 在庫ワークフロー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: #F3F4F1;
+    --panel: #FFFFFF;
+    --ink: #1E2A26;
+    --ink-soft: #5C6D66;
+    --ink-faint: #93A29B;
+    --line: #E4E8E2;
+    --line-strong: #CBD3C7;
+    --amber: #D98F2B;
+    --amber-ink: #6B4310;
+    --amber-tint: #FBF0DC;
+    --teal: #2C7A6B;
+    --teal-ink: #113D34;
+    --teal-tint: #E1F0EB;
+    --coral: #C6533B;
+    --coral-ink: #5E2115;
+    --coral-tint: #FAE4DE;
+    --slate: #5C7089;
+    --slate-ink: #263646;
+    --slate-tint: #E7EBF1;
+    --radius: 8px;
+    --radius-sm: 6px;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Zen Kaku Gothic New', sans-serif;
+    --sidebar-w: 208px;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; background: var(--paper); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; font-size: 14px; }
+  ::-webkit-scrollbar{ width: 9px; height: 9px; }
+  ::-webkit-scrollbar-thumb{ background: var(--line-strong); border-radius: 5px; }
+
+  a{ color: inherit; }
+
+  /* ---- layout shell ---- */
+  #shell{ display:flex; min-height: 100vh; }
+  #sidebar{
+    width: var(--sidebar-w); flex-shrink:0; background: var(--panel); border-right: 1px solid var(--line);
+    padding: 18px 12px; position: sticky; top:0; height: 100vh; overflow-y:auto;
+  }
+  #sidebar .brand{ font-weight: 900; font-size: 16px; padding: 4px 8px 18px; letter-spacing: 0.02em; }
+  #sidebar .navgroup{ margin-bottom: 16px; }
+  #sidebar .navgroup .gt{ font-family: var(--mono); font-size: 10px; color: var(--ink-faint); letter-spacing: 0.1em; text-transform: uppercase; padding: 0 8px 6px; }
+  #sidebar .navitem{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding: 7px 8px; border-radius: var(--radius-sm); font-size: 13px; cursor:pointer; color: var(--ink-soft);
+  }
+  #sidebar .navitem:hover{ background: var(--paper); color: var(--ink); }
+  #sidebar .navitem.active{ background: var(--teal-tint); color: var(--teal-ink); font-weight: 700; }
+  #sidebar .navitem .c{ font-family: var(--mono); font-size: 11px; color: var(--ink-faint); }
+  #sidebar .navitem.active .c{ color: var(--teal-ink); }
+
+  #main{ flex:1; min-width:0; max-width: 1400px; margin: 0 auto; padding: 20px 28px 80px; width: 100%; }
+
+  /* ---- topbar ---- */
+  .topbar{ display:flex; align-items:center; justify-content:space-between; gap: 12px; margin-bottom: 22px; flex-wrap: wrap; }
+  .topbar h1{ font-size: 19px; font-weight: 900; margin:0; }
+  .topbar .save-indicator{ font-size: 11.5px; color: var(--ink-faint); display:flex; align-items:center; gap: 5px; }
+  .topbar .save-indicator .dot{ width:6px; height:6px; border-radius:50%; background: var(--teal); }
+  .auth-area{ display:flex; align-items:center; gap:8px; font-size:12px; }
+  .auth-area .who{ display:flex; align-items:center; gap:6px; color: var(--ink-soft); }
+  .auth-area .who img{ width:20px; height:20px; border-radius:50%; }
+  .auth-area .sync-status{ font-size: 10.5px; color: var(--ink-faint); }
+  .topbar .actions{ display:flex; gap:8px; align-items:center; }
+
+  button{
+    font-family: var(--sans); font-size: 12.5px; font-weight: 700;
+    border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
+    background: var(--panel); color: var(--ink);
+    padding: 7px 12px; cursor: pointer; white-space: nowrap;
+    transition: background 0.1s ease, border-color .1s ease;
+  }
+  button:hover{ background: var(--paper); border-color: var(--ink-faint); }
+  button:active{ transform: translateY(1px); }
+  button.primary{ background: var(--ink); color: #fff; border-color: var(--ink); }
+  button.primary:hover{ background: #0f1815; }
+  button.ghost{ border-color: transparent; background: transparent; }
+  button.ghost:hover{ background: var(--paper); }
+  button.danger{ border-color: var(--coral); color: var(--coral-ink); }
+  button.danger:hover{ background: var(--coral-tint); }
+  button.sm{ padding: 4px 9px; font-size: 11.5px; }
+  button.icon{ padding: 5px 8px; }
+
+  textarea, input[type=text], input:not([type]), select{
+    font-family: var(--mono); font-size: 13px; color: var(--ink);
+    background: #fff; border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
+    padding: 7px 9px; width: 100%; box-sizing: border-box;
+  }
+  textarea:focus, input:focus, select:focus{ outline:none; border-color: var(--ink); box-shadow: 0 0 0 3px rgba(30,42,38,0.06); }
+  select{ font-family: var(--sans); appearance:none; background-image: linear-gradient(45deg, transparent 50%, var(--ink-soft) 50%), linear-gradient(135deg, var(--ink-soft) 50%, transparent 50%); background-position: calc(100% - 14px) 52%, calc(100% - 9px) 52%; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; padding-right: 26px; }
+
+  .card{ background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+
+  /* ---- dashboard ---- */
+  .dash-grid{ display:grid; grid-template-columns: repeat(auto-fit, minmax(118px,1fr)); gap: 8px; margin-bottom: 22px; }
+  .dash-tile{ background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; cursor:pointer; text-align:left; }
+  .dash-tile:hover{ border-color: var(--line-strong); }
+  .dash-tile.active{ border-color: var(--teal); background: var(--teal-tint); }
+  .dash-tile .n{ font-family: var(--mono); font-size: 22px; font-weight:700; line-height:1; }
+  .dash-tile .l{ font-size: 11px; color: var(--ink-soft); margin-top: 5px; }
+
+  .section-title{ font-size: 13px; font-weight: 700; margin: 0 0 10px; display:flex; align-items:center; gap:8px; }
+  .section-title .muted{ font-weight: 400; color: var(--ink-faint); font-size: 11.5px; }
+
+  .today-row{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom: 22px; }
+  .today-chip{
+    display:flex; align-items:center; gap: 7px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 999px; padding: 7px 14px 7px 10px; cursor:pointer; font-size: 12.5px;
+  }
+  .today-chip:hover{ border-color: var(--line-strong); }
+  .today-chip.active{ border-color: var(--ink); background: var(--ink); color:#fff; }
+  .today-chip .n{ font-family: var(--mono); font-weight: 700; }
+
+  .loc-row{ display:grid; grid-template-columns: repeat(auto-fit, minmax(100px,1fr)); gap:8px; margin-bottom: 22px; }
+  .loc-card{ background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; cursor:pointer; text-align:center; }
+  .loc-card:hover{ border-color: var(--line-strong); }
+  .loc-card.active{ border-color: var(--slate); background: var(--slate-tint); }
+  .loc-card .code{ font-family: var(--mono); font-weight:700; font-size:14px; }
+  .loc-card .n{ font-size: 11px; color: var(--ink-soft); margin-top:2px; }
+
+  /* ---- collapsible sections ---- */
+  details.section{ background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 14px; }
+  details.section > summary{
+    cursor: pointer; list-style: none; padding: 12px 16px; font-size: 13px; font-weight: 700; display:flex; align-items:center; gap:8px;
+  }
+  details.section > summary::-webkit-details-marker{ display:none; }
+  details.section > summary::before{ content: "▸"; color: var(--ink-faint); font-size: 11px; }
+  details.section[open] > summary::before{ content: "▾"; }
+  details.section .body{ padding: 0 16px 16px; border-top: 1px solid var(--line); padding-top: 14px; }
+  .hint{ font-size: 12px; color: var(--ink-soft); margin: 0 0 10px; line-height: 1.6; }
+  .row{ display:flex; gap:8px; flex-wrap:wrap; }
+  .row > *{ flex:1; min-width: 130px; }
+
+  /* ---- filters ---- */
+  .filter-bar{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom: 10px; align-items:center; }
+  .filter-bar textarea{ flex:2; min-width:200px; min-height: 34px; resize: vertical; }
+  .filter-bar select{ flex:1; min-width: 130px; }
+  .chip-row{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom: 12px; }
+  .qchip{ font-size: 11.5px; padding: 5px 11px; border-radius:999px; border:1px solid var(--line-strong); background:var(--panel); cursor:pointer; }
+  .qchip.active{ background: var(--ink); color:#fff; border-color: var(--ink); }
+
+  /* ---- bulk bar ---- */
+  .bulkbar{ display:none; align-items:center; gap:7px; flex-wrap:wrap; background: var(--ink); color:#fff; border-radius: var(--radius); padding: 9px 12px; margin-bottom: 10px; }
+  .bulkbar.active{ display:flex; }
+  .bulkbar .count{ font-family: var(--mono); font-size:12px; font-weight:700; margin-right:2px; }
+  .bulkbar button{ background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.25); color:#fff; }
+  .bulkbar button:hover{ background: rgba(255,255,255,0.18); }
+  .bulkbar button.danger{ background: var(--coral); border-color: var(--coral); color:#fff; }
+  .bulkbar select{ width:auto; min-width:90px; padding:4px 22px 4px 8px; font-size:11.5px; }
+  .bulkbar .spacer{ flex:1; }
+
+  /* ---- badges ---- */
+  .badge{ display:inline-flex; align-items:center; font-size: 11px; font-weight:700; padding: 3px 8px; border-radius: 999px; white-space:nowrap; }
+  .badge.slate{ background: var(--slate-tint); color: var(--slate-ink); }
+  .badge.teal{ background: var(--teal-tint); color: var(--teal-ink); }
+  .badge.amber{ background: var(--amber-tint); color: var(--amber-ink); }
+  .badge.coral{ background: var(--coral-tint); color: var(--coral-ink); }
+
+  /* ---- list ---- */
+  .board{ border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); overflow:hidden; }
+  .empty{ padding: 30px 16px; text-align:center; color: var(--ink-faint); font-size:13px; }
+  .list-head, .item-row{ display:grid; grid-template-columns: 26px 1.1fr 84px 96px 108px 128px 1.3fr 108px 30px; align-items:center; gap:10px; }
+  .list-head{ font-size: 10.5px; color: var(--ink-faint); letter-spacing:0.04em; padding: 8px 14px; border-bottom: 1px solid var(--line); background: var(--paper); }
+  .item-row{ padding: 9px 14px; border-bottom: 1px solid var(--line); }
+  .item-row:last-child{ border-bottom:none; }
+  .item-row:hover{ background: #FAFBF9; }
+  .item-row .code{ font-family: var(--mono); font-weight:700; font-size:13px; cursor:pointer; text-decoration: underline dotted var(--line-strong); }
+  .item-row .code:hover{ color: var(--teal-ink); }
+  .item-row .loc{ font-family: var(--mono); font-size: 12px; color: var(--ink-soft); }
+  .next-action{ display:flex; align-items:center; gap:6px; font-size: 12.5px; font-weight: 700; }
+  .next-action.done{ color: var(--ink-faint); font-weight: 400; }
+  .row-actions{ display:flex; gap:6px; align-items:center; justify-content:flex-end; }
+  .menu-wrap{ position:relative; }
+  .menu-dd{ display:none; position:absolute; right:0; top: 100%; margin-top:4px; background:#fff; border:1px solid var(--line-strong); border-radius: var(--radius-sm); box-shadow: 0 6px 18px rgba(0,0,0,0.1); min-width: 120px; z-index: 20; overflow:hidden; }
+  .menu-dd.open{ display:block; }
+  .menu-dd button{ display:block; width:100%; text-align:left; border:none; border-radius:0; padding: 8px 12px; background:#fff; font-size:12.5px; }
+  .menu-dd button:hover{ background: var(--paper); }
+  .menu-dd button.danger{ color: var(--coral-ink); }
+
+  input[type=checkbox]{ width:15px; height:15px; accent-color: var(--ink); cursor:pointer; }
+
+  /* mobile cards */
+  .item-card{ display:none; }
+  @media (max-width: 900px){
+    #sidebar{ display:none; }
+    .list-head{ display:none; }
+    .item-row{ display:none; }
+    .item-card{
+      display:block; background: var(--panel); border-bottom: 1px solid var(--line); padding: 12px 14px;
+    }
+    .item-card .top{ display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+    .item-card .code{ font-family: var(--mono); font-weight:700; font-size:14px; cursor:pointer; }
+    .item-card .loc{ font-family: var(--mono); font-size:11.5px; color: var(--ink-soft); }
+    .item-card .badges{ display:flex; gap:6px; flex-wrap:wrap; margin: 8px 0; }
+    .item-card .bottom{ display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:6px; }
+    #main{ padding: 16px 14px 90px; }
+  }
+
+  /* ---- drawer ---- */
+  #overlay{ display:none; position:fixed; inset:0; background: rgba(20,26,24,0.35); z-index: 40; }
+  #overlay.open{ display:block; }
+  #drawer{
+    display:none; position:fixed; right:0; top:0; bottom:0; width: 380px; max-width: 92vw; background: var(--panel);
+    z-index: 41; box-shadow: -8px 0 24px rgba(0,0,0,0.12); overflow-y:auto; padding: 20px;
+  }
+  #drawer.open{ display:block; }
+  #drawer .dhead{ display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px; }
+  #drawer .dcode{ font-family: var(--mono); font-size: 20px; font-weight: 900; }
+  #drawer .dsection{ margin-top: 18px; }
+  #drawer .dlabel{ font-size: 10.5px; color: var(--ink-faint); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:6px; }
+  #drawer .dbtns{ display:flex; gap:6px; flex-wrap:wrap; }
+  #drawer .dbtns button{ flex:1; }
+  #drawer .toggle-row{ display:flex; align-items:center; justify-content:space-between; padding: 8px 0; border-top: 1px solid var(--line); }
+  #drawer .next-box{ background: var(--paper); border-radius: var(--radius); padding: 12px 14px; margin: 14px 0; font-size: 14px; font-weight: 700; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+
+  /* ---- toast (undo) ---- */
+  #toast{ display:none; position:fixed; left:50%; bottom:22px; transform: translateX(-50%); background: var(--ink); color:#fff; border-radius: var(--radius); padding: 10px 16px; font-size:13px; align-items:center; gap:12px; z-index: 50; box-shadow: 0 6px 20px rgba(0,0,0,0.2); }
+  #toast.open{ display:flex; }
+  #toast button{ background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.3); color:#fff; }
+
+  /* ---- modal ---- */
+  .modal-overlay{ display:none; position:fixed; inset:0; background: rgba(20,26,24,0.4); z-index: 60; align-items:center; justify-content:center; }
+  .modal-overlay.open{ display:flex; }
+  .modal-box{ background: var(--panel); border-radius: var(--radius); padding: 20px; width: 340px; max-width: 90vw; box-shadow: 0 12px 32px rgba(0,0,0,0.2); }
+  .modal-title{ font-size: 15px; font-weight: 800; margin-bottom: 8px; }
+  .modal-msg{ font-size: 13px; color: var(--ink-soft); line-height:1.6; }
+  .modal-actions{ display:flex; justify-content:flex-end; gap:8px; margin-top: 18px; }
+
+  /* ---- export grid ---- */
+  .export-grid{ display:grid; grid-template-columns: repeat(auto-fit, minmax(190px,1fr)); gap:10px; }
+  .export-card{ background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px 12px; }
+  .export-card .head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+  .export-card .head .name{ font-size:12px; font-weight:700; }
+  .export-card .head .name .count{ font-family: var(--mono); color: var(--ink-soft); font-weight:400; }
+  .export-card textarea{ height: 64px; resize:vertical; font-size:11px; background:#fff; }
+
+  footer{ text-align:center; font-size: 10.5px; color: var(--ink-faint); margin-top: 30px; font-family: var(--mono); }
+
+  /* mobile bottom nav */
+  #bottomnav{ display:none; }
+  @media (max-width: 900px){
+    #bottomnav{
+      display:flex; position:fixed; left:0; right:0; bottom:0; background: var(--panel); border-top:1px solid var(--line);
+      z-index: 30; justify-content: space-around; padding: 6px 4px;
+    }
+    #bottomnav button{ flex:1; border:none; background:transparent; font-size:10.5px; padding:6px 2px; }
+    #bottomnav button.active{ color: var(--teal-ink); font-weight:700; }
+  }
+</style>
+</head>
+<body>
+
+<div id="shell">
+  <nav id="sidebar">
+    <div class="brand">検品台帳</div>
+    <div class="navgroup">
+      <div class="navitem" data-nav="dashboard">ダッシュボード</div>
+      <div class="navitem" data-nav="all">すべての商品</div>
+      <div class="navitem" data-nav="today">今日やること</div>
+      <div class="navitem" data-nav="locations">保管場所</div>
+    </div>
+    <div class="navgroup">
+      <div class="gt">作業</div>
+      <div class="navitem" data-quick="not_photo"><span>未撮影</span><span class="c" data-count="not_photo">0</span></div>
+      <div class="navitem" data-quick="img_pending"><span>画像加工</span><span class="c" data-count="img_pending">0</span></div>
+      <div class="navitem" data-quick="draft_pending"><span>下書き</span><span class="c" data-count="draft_pending">0</span></div>
+      <div class="navitem" data-quick="listing_pending"><span>出品待ち</span><span class="c" data-count="listing_pending">0</span></div>
+      <div class="navitem" data-quick="reshoot"><span>再撮影</span><span class="c" data-count="reshoot">0</span></div>
+      <div class="navitem" data-quick="trefac_pending"><span>トレファク</span><span class="c" data-count="trefac_pending">0</span></div>
+    </div>
+    <div class="navgroup">
+      <div class="gt">設定/データ</div>
+      <div class="navitem" data-nav="import">インポート</div>
+      <div class="navitem" data-nav="sheet">スプレッドシート連携</div>
+      <div class="navitem" data-nav="backup">バックアップ</div>
+    </div>
+  </nav>
+
+  <div id="main">
+    <div class="topbar">
+      <h1>検品台帳</h1>
+      <div class="actions">
+        <div class="save-indicator"><span class="dot"></span><span id="saveText">保存済み</span></div>
+        <div id="authArea" class="auth-area"></div>
+        <button class="primary" id="addToggleBtn">＋ 商品を追加</button>
+      </div>
+    </div>
+
+    <details class="section" id="importSection">
+      <summary>商品を追加</summary>
+      <div class="body">
+        <p class="hint">A列のコードを改行・カンマ区切りで貼り付けてください。属性は取り込んだ後、一覧や詳細パネルで設定します。</p>
+        <textarea id="importArea" rows="3" placeholder="to3966&#10;to4123&#10;bt1272"></textarea>
+        <div class="row" style="margin-top:8px;">
+          <button class="primary" id="importBtn">取り込む</button>
+          <button id="csvImportLabel">CSVファイルを取り込む</button>
+          <input type="file" id="csvImportFile" accept=".csv,text/csv" style="display:none;">
+          <button class="danger" id="clearBtn">全て削除</button>
+        </div>
+        <details style="margin-top:14px;">
+          <summary style="cursor:pointer; font-size:12px; color:var(--ink-soft);">既存の分類済みリストをまとめて反映</summary>
+          <div style="margin-top:10px;">
+            <div class="row">
+              <select id="bulkCategory">
+                <option value="loc_C1">保管場所: C1</option>
+                <option value="loc_C2">保管場所: C2</option>
+                <option value="loc_C3">保管場所: C3</option>
+                <option value="loc_C4">保管場所: C4</option>
+                <option value="loc_C5">保管場所: C5</option>
+                <option value="loc_H1">保管場所: H1</option>
+                <option value="loc_H2">保管場所: H2</option>
+                <option value="photo_taken">撮影済みにする</option>
+                <option value="photo_not">未撮影にする</option>
+                <option value="image_done">画像を完成にする</option>
+                <option value="draft_done">下書き済みにする</option>
+                <option value="listed">出品済みにする</option>
+                <option value="reshoot">再撮影フラグを立てる</option>
+                <option value="trefac">トレファク行きにする</option>
+              </select>
+            </div>
+            <textarea id="bulkArea" rows="3" placeholder="コードを改行区切りで貼り付け" style="margin-top:8px;"></textarea>
+            <div class="row" style="margin-top:8px;"><button class="primary" id="bulkApplyBtn">反映する</button></div>
+          </div>
+        </details>
+      </div>
+    </details>
+
+    <div id="dashboardView">
+      <p class="section-title">ダッシュボード</p>
+      <div class="dash-grid" id="dashGrid"></div>
+
+      <p class="section-title">今日やること <span class="muted">クリックで絞り込み</span></p>
+      <div class="today-row" id="todayRow"></div>
+
+      <p class="section-title">保管場所 <span class="muted">クリックで絞り込み</span></p>
+      <div class="loc-row" id="locRow"></div>
+    </div>
+
+    <p class="section-title" id="listTitle">すべての商品</p>
+
+    <div class="filter-bar">
+      <textarea id="searchBox" rows="1" placeholder="コードで検索(複数可: カンマ・スペース・改行区切り)"></textarea>
+      <select id="filterLoc"><option value="all">保管場所: すべて</option></select>
+      <select id="filterPhoto">
+        <option value="all">撮影: すべて</option>
+        <option value="not_taken">未撮影</option>
+        <option value="taken">撮影済</option>
+        <option value="reshoot">再撮影</option>
+      </select>
+      <select id="filterImage">
+        <option value="all">画像: すべて</option>
+        <option value="none">画像なし</option>
+        <option value="waiting">加工待ち</option>
+        <option value="processing">加工中</option>
+        <option value="done">完成</option>
+      </select>
+      <select id="filterListing">
+        <option value="all">出品: すべて</option>
+        <option value="not_listed">未出品</option>
+        <option value="draft_pending">下書き待ち</option>
+        <option value="draft_done">下書き済</option>
+        <option value="listed">出品済</option>
+      </select>
+    </div>
+    <div class="chip-row" id="quickChipRow"></div>
+
+    <div class="bulkbar" id="bulkbar">
+      <span class="count" id="bulkCount">0件選択中</span>
+      <button data-act="photo_taken">撮影完了</button>
+      <button data-act="reshoot">再撮影</button>
+      <button data-act="image_processing">加工開始</button>
+      <button data-act="image_done">加工完了</button>
+      <button data-act="draft_done">下書き完了</button>
+      <button data-act="listed">出品完了</button>
+      <button data-act="trefac">トレファクへ</button>
+      <select id="bulkLocSelect"></select>
+      <button id="bulkLocApply">場所を適用</button>
+      <span class="spacer"></span>
+      <button id="bulkCopyBtn">選択をコピー</button>
+      <button class="danger" id="bulkDeleteBtn">削除</button>
+      <button id="bulkClearBtn">選択解除</button>
+    </div>
+
+    <div class="list-head">
+      <input type="checkbox" id="selectAllBox">
+      <span>商品</span><span>保管場所</span><span>撮影</span><span>画像</span><span>出品</span><span>次にやること</span><span></span><span></span>
+    </div>
+    <div id="itemList" class="board"></div>
+
+    <details class="section" id="sheetSection" style="margin-top:22px;">
+      <summary>スプレッドシート連携(E〜M列書き出し)</summary>
+      <div class="body">
+        <p class="hint">スプレッドシートのE〜M列と互換性のある形式です。「スプレッドシート用にコピー」でタブ区切りのフルデータをコピーできます。</p>
+        <div class="row" style="margin-bottom:14px;">
+          <button class="primary" id="copyForSheetBtn">スプレッドシート用にコピー</button>
+          <button id="csvBtn">CSV保存</button>
+        </div>
+        <div class="export-grid" id="exportGrid"></div>
+      </div>
+    </details>
+
+    <details class="section" id="backupSection">
+      <summary>バックアップ</summary>
+      <div class="body">
+        <p class="hint">ブラウザのデータが消えないよう、こまめにJSONへバックアップしてください。</p>
+        <div class="row">
+          <button id="backupBtn">JSONバックアップ</button>
+          <button id="restoreLabel">JSON復元</button>
+          <input type="file" id="restoreFile" accept="application/json" style="display:none;">
+        </div>
+        <p class="hint" id="backupNote" style="margin-top:8px; margin-bottom:0;"></p>
+      </div>
+    </details>
+
+    <footer>検品台帳 v2 — LOCAL STORAGE / NO SERVER</footer>
+  </div>
+</div>
+
+<div id="bottomnav">
+  <button data-nav="dashboard">📊 ダッシュボード</button>
+  <button data-nav="all">📦 商品</button>
+  <button data-nav="today">✅ 今日</button>
+  <button data-nav="locations">📍 場所</button>
+</div>
+
+<div id="overlay"></div>
+<div id="drawer">
+  <div class="dhead">
+    <div class="dcode" id="dCode">—</div>
+    <button class="icon ghost" id="drawerCloseBtn">×</button>
+  </div>
+  <div class="next-box"><span id="dNextLabel">—</span><button class="sm primary" id="dAdvanceBtn">次へ</button></div>
+
+  <div class="dsection">
+    <div class="dlabel">保管場所</div>
+    <select id="dLoc"></select>
+  </div>
+  <div class="dsection">
+    <div class="dlabel">撮影状態</div>
+    <div class="dbtns">
+      <button class="sm" id="dPhotoNot">未撮影</button>
+      <button class="sm" id="dPhotoTaken">撮影済み</button>
+    </div>
+    <div class="toggle-row"><span>再撮影が必要</span><input type="checkbox" id="dReshoot"></div>
+  </div>
+  <div class="dsection">
+    <div class="dlabel">画像状態</div>
+    <div class="dbtns">
+      <button class="sm" id="dImgWaiting">加工待ち</button>
+      <button class="sm" id="dImgProcessing">加工中</button>
+      <button class="sm" id="dImgDone">完成</button>
+    </div>
+  </div>
+  <div class="dsection">
+    <div class="dlabel">出品状態</div>
+    <div class="toggle-row"><span>下書き済み</span><input type="checkbox" id="dDraft"></div>
+    <div class="dbtns" style="margin-top:8px;">
+      <button class="sm" id="dListingNot">未出品</button>
+      <button class="sm" id="dListingListed">出品済み</button>
+    </div>
+    <div class="toggle-row"><span>トレファクに売る</span><input type="checkbox" id="dTrefac"></div>
+  </div>
+  <div class="dsection">
+    <button class="danger" id="dDeleteBtn" style="width:100%;">この商品を削除</button>
+  </div>
+</div>
+
+<div id="toast">
+  <span id="toastMsg"></span>
+  <button id="toastUndoBtn">元に戻す</button>
+</div>
+
+<div id="modalOverlay" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-title" id="modalTitle"></div>
+    <div class="modal-msg" id="modalMsg"></div>
+    <input type="text" id="modalInput" style="display:none; margin-top:10px;">
+    <div class="modal-actions">
+      <button id="modalCancelBtn">キャンセル</button>
+      <button class="primary" id="modalOkBtn">OK</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+(function(){
+  // ▼▼▼ ここを自分のFirebaseプロジェクトの設定に置き換えてください ▼▼▼
+  var firebaseConfig = {
+    apiKey: "AIzaSyApBFUUpo9eULhbm3AuK6Tsh-iet46i7Lc",
+    authDomain: "zaiko-kanri-e3020.firebaseapp.com",
+    projectId: "zaiko-kanri-e3020",
+    storageBucket: "zaiko-kanri-e3020.firebasestorage.app",
+    messagingSenderId: "985902332755",
+    appId: "1:985902332755:web:c0b3f10b592ead3d573fa6"
+  };
+  // ▲▲▲ ここまで ▲▲▲
+
+  if(!firebaseConfig.apiKey || firebaseConfig.apiKey === 'YOUR_API_KEY'){
+    window.__kenpinFirebaseReady = false;
+    document.addEventListener('DOMContentLoaded', function(){
+      var area = document.getElementById('authArea');
+      if(area) area.innerHTML = '<span class="sync-status">(Firebase未設定 — localStorageのみで動作中)</span>';
+    });
+    return;
+  }
+
+  firebase.initializeApp(firebaseConfig);
+  var auth = firebase.auth();
+  var db = firebase.firestore();
+  window.__kenpinFirebaseReady = true;
+  window.__kenpinAuth = auth;
+  window.__kenpinDb = db;
+})();
+</script>
+<script>
+(function(){
+  var OLD_KEY = 'inventory-tag-data-v1';
+  var NEW_KEY = 'inventory-app-data-v2';
+  var data = {};
+  var selected = {};
+  var quickFilter = null;
+  var currentView = 'dashboard';
+  var lastDeleted = null;
+  var saveTimer = null;
+
+  var LOCS = ['C1','C2','C3','C4','C5','H1','H2'];
+
+  // ---------- persistence & migration ----------
+  function saveRaw(){
+    try{ localStorage.setItem(NEW_KEY, JSON.stringify(data)); }catch(e){}
+  }
+  function markSaved(){
+    var el = document.getElementById('saveText');
+    el.textContent = '保存中…';
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function(){ el.textContent = '保存済み'; }, 350);
+  }
+  function save(){ repairAll(); saveRaw(); markSaved(); pushToCloud(); }
+
+  // ---------- Firebase auth & cloud sync ----------
+  var fbAuth = window.__kenpinAuth || null;
+  var fbDb = window.__kenpinDb || null;
+  var currentUser = null;
+  var cloudSaveTimer = null;
+  var suppressPush = false;
+
+  function cloudDocRef(){
+    if(!fbDb || !currentUser) return null;
+    return fbDb.collection('users').doc(currentUser.uid).collection('inventory').doc('main');
+  }
+  function setSyncStatus(text){
+    var el = document.getElementById('authArea');
+    if(!el) return;
+    var statusEl = el.querySelector('.sync-status');
+    if(statusEl) statusEl.textContent = text;
+  }
+  function renderAuthArea(){
+    var el = document.getElementById('authArea');
+    if(!el) return;
+    if(!window.__kenpinFirebaseReady){
+      el.innerHTML = '<span class="sync-status">(Firebase未設定 — localStorageのみで動作中)</span>';
+      return;
+    }
+    if(currentUser){
+      el.innerHTML =
+        '<div class="who">' +
+          (currentUser.photoURL ? '<img src="' + currentUser.photoURL + '">' : '') +
+          '<span>' + (currentUser.displayName || currentUser.email || 'ログイン中') + '</span>' +
+        '</div>' +
+        '<button class="sm" id="signOutBtn">ログアウト</button>' +
+        '<span class="sync-status" id="cloudSyncStatus">同期済み</span>';
+      document.getElementById('signOutBtn').addEventListener('click', function(){ fbAuth.signOut(); });
+    } else {
+      el.innerHTML = '<button class="sm" id="signInBtn">Googleでログイン</button><span class="sync-status"></span>';
+      document.getElementById('signInBtn').addEventListener('click', function(){
+        var provider = new firebase.auth.GoogleAuthProvider();
+        fbAuth.signInWithPopup(provider).catch(function(err){ alert('ログインに失敗しました: ' + err.message); });
+      });
+    }
+  }
+  function pullFromCloud(){
+    var ref = cloudDocRef();
+    if(!ref) return;
+    setSyncStatus('クラウドから読み込み中…');
+    ref.get().then(function(doc){
+      if(doc.exists){
+        var cloud = (doc.data() || {}).items || {};
+        suppressPush = true;
+        Object.keys(cloud).forEach(function(code){ data[code] = cloud[code]; });
+        saveRaw();
+        suppressPush = false;
+        renderAll();
+      }
+      setSyncStatus('同期済み');
+    }).catch(function(err){
+      setSyncStatus('読み込み失敗');
+      console.error(err);
+    });
+  }
+  function pushToCloud(){
+    var ref = cloudDocRef();
+    if(!ref || suppressPush) return;
+    setSyncStatus('クラウドへ保存中…');
+    clearTimeout(cloudSaveTimer);
+    cloudSaveTimer = setTimeout(function(){
+      ref.set({ items: data, updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
+        .then(function(){ setSyncStatus('同期済み'); })
+        .catch(function(err){ setSyncStatus('保存失敗'); console.error(err); });
+    }, 700);
+  }
+  if(fbAuth){
+    fbAuth.onAuthStateChanged(function(user){
+      currentUser = user;
+      renderAuthArea();
+      if(user) pullFromCloud();
+    });
+  } else {
+    document.addEventListener('DOMContentLoaded', renderAuthArea);
+  }
+
+  function ensure(code){
+    if(!data[code]){
+      data[code] = {
+        code: code, location: '', photoStatus: 'not_taken', needsReshoot: false,
+        imageStatus: 'waiting', draftDone: false, listingStatus: 'not_listed', sellToTrefac: false
+      };
+    }
+    return data[code];
+  }
+
+  function migrateFromOld(){
+    var raw;
+    try{ raw = localStorage.getItem(OLD_KEY); }catch(e){ raw = null; }
+    if(!raw) return;
+    var old;
+    try{ old = JSON.parse(raw); }catch(e){ return; }
+    if(!old || typeof old !== 'object') return;
+
+    try{ localStorage.setItem(OLD_KEY + '-backup-' + Date.now(), raw); }catch(e){}
+
+    Object.keys(old).forEach(function(code){
+      var o = old[code] || {};
+      var it = ensure(code);
+      var wasPhotographed = o.image === 'yes';
+      var wasNoPhoto = o.image === 'no';
+      var locWasNoPhoto = o.loc === '未撮影';
+
+      it.photoStatus = wasPhotographed ? 'taken' : 'not_taken';
+      if(!wasPhotographed && !wasNoPhoto && !locWasNoPhoto && o.loc){
+        it.photoStatus = 'taken'; // has a location but no explicit image flag: assume handled
+      }
+      it.location = (o.loc && o.loc !== '未撮影') ? o.loc : '';
+
+      it.needsReshoot = o.sub === 'reshoot';
+      if(o.sub === 'processing'){ it.imageStatus = 'processing'; it.photoStatus = 'taken'; }
+      else if(wasPhotographed){ it.imageStatus = 'done'; }
+      else { it.imageStatus = 'waiting'; }
+
+      it.listingStatus = o.listed === 'yes' ? 'listed' : 'not_listed';
+      it.draftDone = o.listed === 'yes' ? true : false;
+      it.sellToTrefac = o.sub === 'trefac';
+      repairInvariants(it);
+    });
+    save();
+  }
+
+  // 出品済み(またはトレファク済み)なら、撮影・画像加工は必ず完了しているはず、という
+  // 整合性を常に強制する。矛盾した表示("出品済なのに未撮影")を防ぐ。
+  function repairInvariants(it){
+    if(it.listingStatus === 'listed' || it.listingStatus === 'trefac_sold'){
+      it.photoStatus = 'taken';
+      it.imageStatus = 'done';
+      it.needsReshoot = false;
+    }
+  }
+  function repairAll(){
+    Object.keys(data).forEach(function(c){ repairInvariants(data[c]); });
+  }
+
+  function load(){
+    var raw;
+    try{ raw = localStorage.getItem(NEW_KEY); }catch(e){ raw = null; }
+    if(raw){
+      try{ data = JSON.parse(raw); }catch(e){ data = {}; }
+    } else {
+      migrateFromOld();
+    }
+    Object.keys(data).forEach(function(c){ ensure(c); }); // fill defaults for any partial records
+    repairAll();
+    saveRaw();
+    renderAll();
+  }
+
+  // ---------- state machine ----------
+  function computeNextAction(it){
+    if(it.listingStatus === 'listed') return { key:'done', label:'完了', emoji:'✅', advanceLabel:null };
+    if(it.listingStatus === 'trefac_sold') return { key:'done', label:'完了(トレファク)', emoji:'✅', advanceLabel:null };
+    if(it.needsReshoot) return { key:'reshoot', label:'再撮影する', emoji:'🔄', advanceLabel:'再撮影完了' };
+    if(it.sellToTrefac) return { key:'trefac', label:'トレファクへ', emoji:'🏪', advanceLabel:'トレファク完了' };
+    if(it.photoStatus !== 'taken') return { key:'photo', label:'撮影する', emoji:'📷', advanceLabel:'撮影完了' };
+    if(it.imageStatus !== 'done') return { key:'image', label:'画像加工する', emoji:'🖼', advanceLabel:'加工完了' };
+    if(!it.draftDone) return { key:'draft', label:'下書きを書く', emoji:'✏️', advanceLabel:'下書き完了' };
+    return { key:'listing', label:'出品する', emoji:'🚀', advanceLabel:'出品完了' };
+  }
+
+  function advance(it){
+    var na = computeNextAction(it);
+    switch(na.key){
+      case 'reshoot': it.needsReshoot = false; break;
+      case 'trefac': it.listingStatus = 'trefac_sold'; break;
+      case 'photo': it.photoStatus = 'taken'; break;
+      case 'image': it.imageStatus = 'done'; break;
+      case 'draft': it.draftDone = true; break;
+      case 'listing': it.listingStatus = 'listed'; break;
+      default: break;
+    }
+  }
+
+  function photoBadge(it){
+    if(it.needsReshoot) return { label:'再撮影', tone:'coral' };
+    if(it.photoStatus === 'taken') return { label:'撮影済', tone:'teal' };
+    return { label:'未撮影', tone:'slate' };
+  }
+  function imageBadge(it){
+    if(it.photoStatus !== 'taken') return { label:'画像なし', tone:'slate' };
+    if(it.imageStatus === 'done') return { label:'完成', tone:'teal' };
+    if(it.imageStatus === 'processing') return { label:'加工中', tone:'amber' };
+    return { label:'加工待ち', tone:'slate' };
+  }
+  function listingBadge(it){
+    if(it.listingStatus === 'listed') return { label:'出品済', tone:'teal' };
+    if(it.listingStatus === 'trefac_sold') return { label:'トレファク済', tone:'amber' };
+    if(it.draftDone) return { label:'下書き済', tone:'amber' };
+    if(it.photoStatus === 'taken' && it.imageStatus === 'done') return { label:'下書き待ち', tone:'slate' };
+    return { label:'未出品', tone:'slate' };
+  }
+
+  function matchesQuick(it, key){
+    if(!key) return true;
+    switch(key){
+      case 'not_photo': return it.photoStatus !== 'taken' && !it.needsReshoot;
+      case 'reshoot': return it.needsReshoot;
+      case 'img_waiting': return it.photoStatus === 'taken' && !it.needsReshoot && it.imageStatus === 'waiting';
+      case 'img_processing': return it.imageStatus === 'processing';
+      case 'img_pending': return it.photoStatus === 'taken' && !it.needsReshoot && it.imageStatus !== 'done';
+      case 'draft_pending': return it.photoStatus === 'taken' && !it.needsReshoot && it.imageStatus === 'done' && !it.draftDone && it.listingStatus === 'not_listed';
+      case 'listing_pending': return it.draftDone && it.listingStatus === 'not_listed' && !it.needsReshoot;
+      case 'listed': return it.listingStatus === 'listed';
+      case 'trefac_pending': return it.sellToTrefac && it.listingStatus !== 'trefac_sold';
+      default: return true;
+    }
+  }
+
+  function computeCounts(){
+    var codes = Object.keys(data);
+    var c = { total: codes.length, not_photo:0, reshoot:0, img_waiting:0, img_processing:0, img_pending:0, draft_pending:0, listing_pending:0, listed:0, trefac_pending:0, byLoc:{} };
+    LOCS.forEach(function(l){ c.byLoc[l] = 0; });
+    codes.forEach(function(code){
+      var it = data[code];
+      if(matchesQuick(it,'not_photo')) c.not_photo++;
+      if(matchesQuick(it,'reshoot')) c.reshoot++;
+      if(matchesQuick(it,'img_waiting')) c.img_waiting++;
+      if(matchesQuick(it,'img_processing')) c.img_processing++;
+      if(matchesQuick(it,'img_pending')) c.img_pending++;
+      if(matchesQuick(it,'draft_pending')) c.draft_pending++;
+      if(matchesQuick(it,'listing_pending')) c.listing_pending++;
+      if(matchesQuick(it,'listed')) c.listed++;
+      if(matchesQuick(it,'trefac_pending')) c.trefac_pending++;
+      if(it.location && c.byLoc[it.location] !== undefined) c.byLoc[it.location]++;
+      else if(it.location){ c.byLoc[it.location] = (c.byLoc[it.location]||0) + 1; }
+    });
+    return c;
+  }
+
+  // ---------- filter state helpers ----------
+  var filterLoc = document.getElementById('filterLoc');
+  var filterPhoto = document.getElementById('filterPhoto');
+  var filterImage = document.getElementById('filterImage');
+  var filterListing = document.getElementById('filterListing');
+
+  function refreshLocOptions(){
+    var codes = Object.keys(data);
+    var locs = {};
+    codes.forEach(function(c){ if(data[c].location) locs[data[c].location] = true; });
+    var all = LOCS.concat(Object.keys(locs).filter(function(l){ return LOCS.indexOf(l) === -1; }));
+    var current = filterLoc.value;
+    filterLoc.innerHTML = '<option value="all">保管場所: すべて</option>';
+    all.forEach(function(l){
+      var o = document.createElement('option'); o.value = l; o.textContent = l;
+      filterLoc.appendChild(o);
+    });
+    if([].slice.call(filterLoc.options).some(function(o){ return o.value === current; })) filterLoc.value = current;
+  }
+
+  function getVisibleCodes(){
+    var codes = Object.keys(data).sort();
+    var searchTerms = document.getElementById('searchBox').value.split(/[,\s]+/).map(function(s){ return s.trim().toLowerCase(); }).filter(Boolean);
+    var loc = filterLoc.value, photo = filterPhoto.value, image = filterImage.value, listing = filterListing.value;
+
+    return codes.filter(function(code){
+      var it = data[code];
+      if(searchTerms.length && !searchTerms.some(function(t){ return code.toLowerCase().indexOf(t) !== -1; })) return false;
+      if(loc !== 'all' && it.location !== loc) return false;
+      if(photo !== 'all'){
+        var pb = photoBadge(it);
+        var pk = it.needsReshoot ? 'reshoot' : it.photoStatus;
+        if(pk !== photo) return false;
+      }
+      if(image !== 'all'){
+        var ik = it.photoStatus !== 'taken' ? 'none' : it.imageStatus;
+        if(ik !== image) return false;
+      }
+      if(listing !== 'all'){
+        var lb = listingBadge(it);
+        var lk = it.listingStatus === 'listed' ? 'listed' : (it.draftDone ? 'draft_done' : ((it.photoStatus==='taken'&&it.imageStatus==='done') ? 'draft_pending' : 'not_listed'));
+        if(lk !== listing) return false;
+      }
+      if(quickFilter && !matchesQuick(it, quickFilter)) return false;
+      return true;
+    });
+  }
+
+  // ---------- rendering ----------
+  var DASH_TILES = [
+    { key:null, label:'総在庫', metric:function(c){ return c.total; } },
+    { key:'not_photo', label:'未撮影', metric:function(c){ return c.not_photo; } },
+    { key:'reshoot', label:'再撮影', metric:function(c){ return c.reshoot; } },
+    { key:'img_waiting', label:'画像加工待ち', metric:function(c){ return c.img_waiting; } },
+    { key:'img_processing', label:'画像加工中', metric:function(c){ return c.img_processing; } },
+    { key:'draft_pending', label:'下書き待ち', metric:function(c){ return c.draft_pending; } },
+    { key:'listing_pending', label:'出品待ち', metric:function(c){ return c.listing_pending; } },
+    { key:'listed', label:'出品済み', metric:function(c){ return c.listed; } },
+    { key:'trefac_pending', label:'トレファク行き', metric:function(c){ return c.trefac_pending; } }
+  ];
+  var TODAY_CATS = [
+    { key:'not_photo', label:'撮影', emoji:'📷' },
+    { key:'reshoot', label:'再撮影', emoji:'🔄' },
+    { key:'img_pending', label:'画像加工', emoji:'🖼' },
+    { key:'draft_pending', label:'下書き', emoji:'✏️' },
+    { key:'listing_pending', label:'出品', emoji:'🚀' },
+    { key:'trefac_pending', label:'トレファク', emoji:'🏪' }
+  ];
+  var QUICK_CHIPS = TODAY_CATS;
+
+  function setQuickFilter(key){
+    quickFilter = (quickFilter === key) ? null : key;
+    renderAll();
+    document.getElementById('itemList').scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+
+  function renderSidebarCounts(c){
+    document.getElementById('sidebar').querySelectorAll('[data-count]').forEach(function(el){
+      var key = el.getAttribute('data-count');
+      el.textContent = c[key] !== undefined ? c[key] : 0;
+    });
+    document.getElementById('sidebar').querySelectorAll('.navitem[data-nav]').forEach(function(el){
+      el.classList.toggle('active', el.getAttribute('data-nav') === currentView);
+    });
+    document.getElementById('sidebar').querySelectorAll('.navitem[data-quick]').forEach(function(el){
+      el.classList.toggle('active', el.getAttribute('data-quick') === quickFilter);
+    });
+    document.querySelectorAll('#bottomnav button').forEach(function(el){
+      el.classList.toggle('active', el.getAttribute('data-nav') === currentView);
+    });
+  }
+
+  function renderDash(c){
+    var grid = document.getElementById('dashGrid');
+    grid.innerHTML = '';
+    DASH_TILES.forEach(function(t){
+      var el = document.createElement('div');
+      el.className = 'dash-tile' + (quickFilter === t.key && t.key ? ' active' : '');
+      el.innerHTML = '<div class="n">' + t.metric(c) + '</div><div class="l">' + t.label + '</div>';
+      el.addEventListener('click', function(){ if(t.key) setQuickFilter(t.key); else { quickFilter = null; renderAll(); } });
+      grid.appendChild(el);
+    });
+
+    var today = document.getElementById('todayRow');
+    today.innerHTML = '';
+    TODAY_CATS.forEach(function(t){
+      var n = c[t.key] || 0;
+      var el = document.createElement('div');
+      el.className = 'today-chip' + (quickFilter === t.key ? ' active' : '');
+      el.innerHTML = '<span>' + t.emoji + ' ' + t.label + '</span><span class="n">' + n + '件</span>';
+      el.addEventListener('click', function(){ setQuickFilter(t.key); });
+      today.appendChild(el);
+    });
+
+    var locRow = document.getElementById('locRow');
+    locRow.innerHTML = '';
+    var locKeys = LOCS.concat(Object.keys(c.byLoc).filter(function(l){ return LOCS.indexOf(l) === -1; }));
+    locKeys.forEach(function(l){
+      var n = c.byLoc[l] || 0;
+      var el = document.createElement('div');
+      el.className = 'loc-card' + (filterLoc.value === l ? ' active' : '');
+      el.innerHTML = '<div class="code">' + l + '</div><div class="n">' + n + '件</div>';
+      el.addEventListener('click', function(){
+        filterLoc.value = (filterLoc.value === l) ? 'all' : l;
+        renderAll();
+        document.getElementById('itemList').scrollIntoView({ behavior:'smooth', block:'start' });
+      });
+      locRow.appendChild(el);
+    });
+
+    var chipRow = document.getElementById('quickChipRow');
+    chipRow.innerHTML = '';
+    QUICK_CHIPS.forEach(function(t){
+      var el = document.createElement('button');
+      el.className = 'qchip' + (quickFilter === t.key ? ' active' : '');
+      el.textContent = t.emoji + ' ' + t.label;
+      el.addEventListener('click', function(){ setQuickFilter(t.key); });
+      chipRow.appendChild(el);
+    });
+  }
+
+  function badgeHtml(b){ return '<span class="badge ' + b.tone + '">' + b.label + '</span>'; }
+
+  function closeAllMenus(){
+    document.querySelectorAll('.menu-dd.open').forEach(function(m){ m.classList.remove('open'); });
+  }
+  document.addEventListener('click', function(e){
+    if(!e.target.closest('.menu-wrap')) closeAllMenus();
+  });
+
+  function renderList(){
+    var visible = getVisibleCodes();
+    var listEl = document.getElementById('itemList');
+    listEl.innerHTML = '';
+
+    document.getElementById('listTitle').textContent =
+      currentView === 'today' ? '今日やること — 対象商品' :
+      currentView === 'locations' ? '保管場所別 — 対象商品' :
+      'すべての商品';
+
+    if(visible.length === 0){
+      var empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = Object.keys(data).length === 0 ? 'まだ商品が登録されていません。「＋ 商品を追加」から始めてください。' : '該当する商品がありません。';
+      listEl.appendChild(empty);
+      updateBulkbar();
+      return;
+    }
+
+    Object.keys(selected).forEach(function(c){ if(!data[c]) delete selected[c]; });
+
+    visible.forEach(function(code){
+      var it = data[code];
+      var na = computeNextAction(it);
+      var pb = photoBadge(it), ib = imageBadge(it), lb = listingBadge(it);
+
+      // desktop row
+      var row = document.createElement('div');
+      row.className = 'item-row';
+
+      var cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.checked = !!selected[code];
+      cb.addEventListener('change', function(){ if(selected[code]) delete selected[code]; else selected[code]=true; renderList(); updateBulkbar(); });
+      row.appendChild(cb);
+
+      var codeEl = document.createElement('span');
+      codeEl.className = 'code'; codeEl.textContent = code;
+      codeEl.addEventListener('click', function(){ openDrawer(code); });
+      row.appendChild(codeEl);
+
+      var locEl = document.createElement('span');
+      locEl.className = 'loc'; locEl.textContent = it.location || '—';
+      row.appendChild(locEl);
+
+      var pWrap = document.createElement('span'); pWrap.innerHTML = badgeHtml(pb); row.appendChild(pWrap);
+      var iWrap = document.createElement('span'); iWrap.innerHTML = badgeHtml(ib); row.appendChild(iWrap);
+      var lWrap = document.createElement('span'); lWrap.innerHTML = badgeHtml(lb); row.appendChild(lWrap);
+
+      var naEl = document.createElement('div');
+      naEl.className = 'next-action' + (na.key === 'done' ? ' done' : '');
+      naEl.innerHTML = '<span>' + na.emoji + '</span><span>' + na.label + '</span>';
+      row.appendChild(naEl);
+
+      var actWrap = document.createElement('div'); actWrap.className = 'row-actions';
+      if(na.advanceLabel){
+        var advBtn = document.createElement('button');
+        advBtn.className = 'sm primary'; advBtn.textContent = na.advanceLabel;
+        advBtn.addEventListener('click', function(){ advance(it); save(); renderAll(); });
+        actWrap.appendChild(advBtn);
+      }
+      row.appendChild(actWrap);
+
+      var menuWrap = document.createElement('div'); menuWrap.className = 'menu-wrap';
+      var menuBtn = document.createElement('button'); menuBtn.className = 'icon ghost sm'; menuBtn.textContent = '⋯';
+      var dd = document.createElement('div'); dd.className = 'menu-dd';
+      var detailBtn = document.createElement('button'); detailBtn.textContent = '詳細を開く';
+      detailBtn.addEventListener('click', function(){ closeAllMenus(); openDrawer(code); });
+      var delBtn = document.createElement('button'); delBtn.className = 'danger'; delBtn.textContent = '削除';
+      delBtn.addEventListener('click', function(){ closeAllMenus(); deleteItems([code]); });
+      dd.appendChild(detailBtn); dd.appendChild(delBtn);
+      menuBtn.addEventListener('click', function(e){ e.stopPropagation(); var open = dd.classList.contains('open'); closeAllMenus(); if(!open) dd.classList.add('open'); });
+      menuWrap.appendChild(menuBtn); menuWrap.appendChild(dd);
+      row.appendChild(menuWrap);
+
+      listEl.appendChild(row);
+
+      // mobile card
+      var card = document.createElement('div');
+      card.className = 'item-card';
+      var top = document.createElement('div'); top.className = 'top';
+      var left = document.createElement('div');
+      var codeM = document.createElement('div'); codeM.className = 'code'; codeM.textContent = code;
+      codeM.addEventListener('click', function(){ openDrawer(code); });
+      var locM = document.createElement('div'); locM.className = 'loc'; locM.textContent = it.location || '保管場所未設定';
+      left.appendChild(codeM); left.appendChild(locM);
+      top.appendChild(left);
+      var cbM = cb.cloneNode(); cbM.checked = !!selected[code];
+      cbM.addEventListener('change', function(){ if(selected[code]) delete selected[code]; else selected[code]=true; renderList(); updateBulkbar(); });
+      top.appendChild(cbM);
+      card.appendChild(top);
+
+      var badges = document.createElement('div'); badges.className = 'badges';
+      badges.innerHTML = badgeHtml(pb) + badgeHtml(ib) + badgeHtml(lb);
+      card.appendChild(badges);
+
+      var bottom = document.createElement('div'); bottom.className = 'bottom';
+      var naM = document.createElement('div'); naM.className = 'next-action' + (na.key==='done'?' done':'');
+      naM.innerHTML = '<span>' + na.emoji + '</span><span>' + na.label + '</span>';
+      bottom.appendChild(naM);
+      if(na.advanceLabel){
+        var advBtnM = document.createElement('button'); advBtnM.className = 'sm primary'; advBtnM.textContent = na.advanceLabel;
+        advBtnM.addEventListener('click', function(){ advance(it); save(); renderAll(); });
+        bottom.appendChild(advBtnM);
+      }
+      card.appendChild(bottom);
+      listEl.appendChild(card);
+    });
+
+    updateBulkbar();
+    var allBox = document.getElementById('selectAllBox');
+    allBox.checked = visible.length > 0 && visible.every(function(c){ return selected[c]; });
+  }
+
+  function updateBulkbar(){
+    var n = Object.keys(selected).length;
+    var bar = document.getElementById('bulkbar');
+    bar.classList.toggle('active', n > 0);
+    document.getElementById('bulkCount').textContent = n + '件選択中';
+  }
+
+  document.getElementById('selectAllBox').addEventListener('change', function(e){
+    var visible = getVisibleCodes();
+    if(e.target.checked) visible.forEach(function(c){ selected[c] = true; });
+    else visible.forEach(function(c){ delete selected[c]; });
+    renderList();
+  });
+
+  function renderExport(){
+    var codes = Object.keys(data);
+    function grp(pred){ return codes.filter(function(c){ return pred(data[c]); }); }
+    var groups = [
+      { label:'画像あり', list: grp(function(it){ return it.photoStatus==='taken'; }) },
+      { label:'未出品', list: grp(function(it){ return it.listingStatus==='not_listed'; }) },
+      { label:'出品済み', list: grp(function(it){ return it.listingStatus==='listed'; }) },
+      { label:'未出品・画像あり', list: grp(function(it){ return it.listingStatus==='not_listed' && it.photoStatus==='taken'; }) },
+      { label:'未出品・画像なし', list: grp(function(it){ return it.listingStatus==='not_listed' && it.photoStatus!=='taken'; }) },
+      { label:'トレファクに売る', list: grp(function(it){ return it.sellToTrefac; }) },
+      { label:'画像加工中', list: grp(function(it){ return it.imageStatus==='processing'; }) },
+      { label:'再撮影', list: grp(function(it){ return it.needsReshoot; }) },
+      { label:'下書きを書く', list: grp(function(it){ return computeNextAction(it).key === 'draft'; }) }
+    ];
+    var grid = document.getElementById('exportGrid');
+    grid.innerHTML = '';
+    groups.forEach(function(g){
+      var card = document.createElement('div'); card.className = 'export-card';
+      var head = document.createElement('div'); head.className = 'head';
+      head.innerHTML = '<span class="name">' + g.label + ' <span class="count">(' + g.list.length + ')</span></span>';
+      var copyBtn = document.createElement('button'); copyBtn.className = 'sm'; copyBtn.textContent = 'コピー';
+      copyBtn.addEventListener('click', function(){
+        navigator.clipboard.writeText(g.list.join('\n')).then(function(){
+          copyBtn.textContent = '完了'; setTimeout(function(){ copyBtn.textContent = 'コピー'; }, 1200);
+        });
+      });
+      head.appendChild(copyBtn);
+      card.appendChild(head);
+      var ta = document.createElement('textarea'); ta.readOnly = true; ta.value = g.list.join('\n');
+      card.appendChild(ta);
+      grid.appendChild(card);
+    });
+  }
+
+  function renderAll(){
+    refreshLocOptions();
+    var c = computeCounts();
+    renderSidebarCounts(c);
+    renderDash(c);
+    renderList();
+    renderExport();
+  }
+
+  // ---------- view switching ----------
+  function setView(view){
+    currentView = view;
+    document.getElementById('dashboardView').style.display = (view === 'dashboard') ? '' : 'none';
+    if(view === 'import'){ document.getElementById('importSection').open = true; document.getElementById('importSection').scrollIntoView({behavior:'smooth'}); }
+    if(view === 'sheet'){ document.getElementById('sheetSection').open = true; document.getElementById('sheetSection').scrollIntoView({behavior:'smooth'}); }
+    if(view === 'backup'){ document.getElementById('backupSection').open = true; document.getElementById('backupSection').scrollIntoView({behavior:'smooth'}); }
+    if(view === 'all'){ quickFilter = null; }
+    renderAll();
+  }
+  document.querySelectorAll('[data-nav]').forEach(function(el){
+    el.addEventListener('click', function(){ setView(el.getAttribute('data-nav')); });
+  });
+  document.querySelectorAll('[data-quick]').forEach(function(el){
+    el.addEventListener('click', function(){ currentView = 'today'; setQuickFilter(el.getAttribute('data-quick')); });
+  });
+
+  // ---------- import / bulk-apply ----------
+  document.getElementById('addToggleBtn').addEventListener('click', function(){
+    var sec = document.getElementById('importSection');
+    sec.open = !sec.open;
+    if(sec.open) sec.scrollIntoView({ behavior:'smooth', block:'start' });
+  });
+
+  document.getElementById('importBtn').addEventListener('click', function(){
+    var raw = document.getElementById('importArea').value;
+    var codes = raw.split(/[\n,\s]+/).map(function(s){ return s.trim(); }).filter(Boolean);
+    codes.forEach(function(c){ ensure(c); });
+    document.getElementById('importArea').value = '';
+    save(); renderAll();
+  });
+  document.getElementById('clearBtn').addEventListener('click', function(){
+    appConfirm('全ての商品データを削除します。よろしいですか?', '全件削除').then(function(ok){
+      if(!ok) return;
+      data = {}; selected = {}; save(); renderAll();
+    });
+  });
+
+  function applyCategoryToCode(code, cat){
+    var it = ensure(code);
+    if(cat.indexOf('loc_') === 0) it.location = cat.replace('loc_','');
+    else if(cat === 'photo_taken') it.photoStatus = 'taken';
+    else if(cat === 'photo_not') it.photoStatus = 'not_taken';
+    else if(cat === 'image_done'){ it.photoStatus='taken'; it.imageStatus = 'done'; }
+    else if(cat === 'draft_done'){ it.draftDone = true; }
+    else if(cat === 'listed'){ it.listingStatus = 'listed'; }
+    else if(cat === 'reshoot'){ it.needsReshoot = true; it.photoStatus='taken'; }
+    else if(cat === 'trefac'){ it.sellToTrefac = true; }
+  }
+  document.getElementById('bulkApplyBtn').addEventListener('click', function(){
+    var cat = document.getElementById('bulkCategory').value;
+    var raw = document.getElementById('bulkArea').value;
+    var codes = raw.split(/[\n,\s]+/).map(function(s){ return s.trim(); }).filter(Boolean);
+    codes.forEach(function(c){ applyCategoryToCode(c, cat); });
+    document.getElementById('bulkArea').value = '';
+    save(); renderAll();
+  });
+
+  // ---------- CSV import ----------
+  function parseCSV(text){
+    var rows = []; var row = []; var field = ''; var inQuotes = false;
+    text = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+    for(var i=0;i<text.length;i++){
+      var ch = text[i];
+      if(inQuotes){
+        if(ch === '"'){ if(text[i+1]==='"'){ field+='"'; i++; } else { inQuotes=false; } }
+        else field += ch;
+      } else {
+        if(ch === '"') inQuotes = true;
+        else if(ch === ',' ){ row.push(field); field=''; }
+        else if(ch === '\n'){ row.push(field); rows.push(row); row=[]; field=''; }
+        else field += ch;
+      }
+    }
+    if(field !== '' || row.length){ row.push(field); rows.push(row); }
+    return rows.filter(function(r){ return r.length>1 || (r.length===1 && r[0]!==''); });
+  }
+  function applyCsvRow(cols){
+    var code = (cols[0]||'').trim();
+    if(!code || code === 'コード') return false;
+    var it = ensure(code);
+    var locVal = (cols[1]||'').trim();
+    var photoVal = (cols[2]||'').trim();
+    var imgVal = (cols[3]||'').trim();
+    var listVal = (cols[4]||'').trim();
+    var reshootVal = (cols[5]||'').trim();
+    var trefacVal = (cols[6]||'').trim();
+    if(locVal) it.location = locVal;
+    if(photoVal === '撮影済み') it.photoStatus = 'taken';
+    else if(photoVal === '未撮影') it.photoStatus = 'not_taken';
+    if(imgVal === '完成') it.imageStatus = 'done';
+    else if(imgVal === '加工中') it.imageStatus = 'processing';
+    else if(imgVal === '加工待ち') it.imageStatus = 'waiting';
+    if(listVal === '出品済み') it.listingStatus = 'listed';
+    else if(listVal === 'トレファク済み') it.listingStatus = 'trefac_sold';
+    else if(listVal === '未出品') it.listingStatus = 'not_listed';
+    if(reshootVal === '要') it.needsReshoot = true;
+    if(trefacVal === '要') it.sellToTrefac = true;
+    return true;
+  }
+  document.getElementById('csvImportLabel').addEventListener('click', function(){ document.getElementById('csvImportFile').click(); });
+  document.getElementById('csvImportFile').addEventListener('change', function(e){
+    var file = e.target.files[0]; if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      var rows = parseCSV(ev.target.result);
+      var count = 0;
+      rows.forEach(function(r){ if(applyCsvRow(r)) count++; });
+      save(); renderAll();
+      document.getElementById('backupNote').textContent = 'CSVから' + count + '件を取り込みました。';
+    };
+    reader.readAsText(file, 'UTF-8');
+    e.target.value = '';
+  });
+
+  // ---------- sheet copy / csv export / backup ----------
+  function pad(n){ return n<10 ? '0'+n : ''+n; }
+  function timestamp(){ var d=new Date(); return d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'-'+pad(d.getHours())+pad(d.getMinutes()); }
+  function downloadFile(filename, content, mime){
+    var blob = new Blob([content], { type: mime });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a'); a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+  function fullRows(codes){
+    var rows = [['コード','保管場所','撮影状態','画像状態','出品状態','再撮影','トレファク']];
+    codes.forEach(function(c){
+      var it = data[c];
+      rows.push([
+        c, it.location || '',
+        it.photoStatus==='taken' ? '撮影済み' : '未撮影',
+        it.imageStatus==='done'?'完成':(it.imageStatus==='processing'?'加工中':'加工待ち'),
+        it.listingStatus==='listed'?'出品済み':(it.listingStatus==='trefac_sold'?'トレファク済み':'未出品'),
+        it.needsReshoot?'要':'',
+        it.sellToTrefac?'要':''
+      ]);
+    });
+    return rows;
+  }
+  document.getElementById('csvBtn').addEventListener('click', function(){
+    var rows = fullRows(Object.keys(data).sort());
+    var csv = rows.map(function(r){ return r.map(function(v){ return '"'+String(v).replace(/"/g,'""')+'"'; }).join(','); }).join('\r\n');
+    downloadFile('kenpin-daicho-'+timestamp()+'.csv', '\uFEFF'+csv, 'text/csv');
+  });
+  document.getElementById('copyForSheetBtn').addEventListener('click', function(){
+    var rows = fullRows(Object.keys(data).sort());
+    var tsv = rows.map(function(r){ return r.join('\t'); }).join('\n');
+    navigator.clipboard.writeText(tsv).then(function(){
+      document.getElementById('backupNote').textContent = '全' + Object.keys(data).length + '件をコピーしました。';
+    });
+  });
+  document.getElementById('backupBtn').addEventListener('click', function(){
+    downloadFile('kenpin-daicho-backup-'+timestamp()+'.json', JSON.stringify(data,null,2), 'application/json');
+    document.getElementById('backupNote').textContent = 'バックアップしました: ' + new Date().toLocaleString('ja-JP');
+  });
+  document.getElementById('restoreLabel').addEventListener('click', function(){ document.getElementById('restoreFile').click(); });
+  document.getElementById('restoreFile').addEventListener('change', function(e){
+    var file = e.target.files[0]; if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      var parsed;
+      try{ parsed = JSON.parse(ev.target.result); }
+      catch(err){ appConfirm('ファイルの読み込みに失敗しました。JSON形式のバックアップファイルを選んでください。', 'エラー'); return; }
+      appConfirm('現在のデータに読み込んだバックアップをマージします。よろしいですか?', '復元の確認').then(function(ok){
+        if(!ok) return;
+        Object.keys(parsed).forEach(function(code){ data[code] = Object.assign(ensure(code), parsed[code]); });
+        save(); renderAll();
+        document.getElementById('backupNote').textContent = '復元しました。';
+      });
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  // ---------- filters ----------
+  [document.getElementById('searchBox'), filterLoc, filterPhoto, filterImage, filterListing].forEach(function(el){
+    el.addEventListener('input', renderList);
+    el.addEventListener('change', renderAll);
+  });
+
+  // ---------- bulk actions ----------
+  document.getElementById('bulkbar').addEventListener('click', function(e){
+    var btn = e.target.closest('button[data-act]');
+    if(!btn) return;
+    var act = btn.getAttribute('data-act');
+    Object.keys(selected).forEach(function(code){
+      var it = ensure(code);
+      if(act === 'photo_taken') it.photoStatus = 'taken';
+      else if(act === 'reshoot'){ it.needsReshoot = true; it.photoStatus = 'taken'; }
+      else if(act === 'image_processing'){ it.photoStatus='taken'; it.imageStatus = 'processing'; }
+      else if(act === 'image_done'){ it.photoStatus='taken'; it.imageStatus = 'done'; }
+      else if(act === 'draft_done') it.draftDone = true;
+      else if(act === 'listed') it.listingStatus = 'listed';
+      else if(act === 'trefac') it.sellToTrefac = true;
+    });
+    save(); renderAll();
+  });
+  var bulkLocSelect = document.getElementById('bulkLocSelect');
+  LOCS.forEach(function(l){ var o=document.createElement('option'); o.value=l; o.textContent=l; bulkLocSelect.appendChild(o); });
+  document.getElementById('bulkLocApply').addEventListener('click', function(){
+    var v = bulkLocSelect.value;
+    Object.keys(selected).forEach(function(code){ ensure(code).location = v; });
+    save(); renderAll();
+  });
+  document.getElementById('bulkCopyBtn').addEventListener('click', function(){
+    var codes = Object.keys(selected).sort();
+    var tsv = fullRows(codes).map(function(r){ return r.join('\t'); }).join('\n');
+    navigator.clipboard.writeText(tsv).then(function(){
+      document.getElementById('backupNote').textContent = '選択した' + codes.length + '件をコピーしました。';
+    });
+  });
+  document.getElementById('bulkDeleteBtn').addEventListener('click', function(){
+    var codes = Object.keys(selected);
+    if(codes.length===0) return;
+    appConfirm(codes.length + '件を削除します。よろしいですか?', '削除の確認').then(function(ok){
+      if(!ok) return;
+      deleteItems(codes);
+      selected = {};
+    });
+  });
+  document.getElementById('bulkClearBtn').addEventListener('click', function(){ selected = {}; renderList(); });
+
+  // ---------- delete + undo ----------
+  function deleteItems(codes){
+    var snapshot = {};
+    codes.forEach(function(c){ if(data[c]) snapshot[c] = data[c]; });
+    codes.forEach(function(c){ delete data[c]; delete selected[c]; });
+    lastDeleted = snapshot;
+    save(); renderAll();
+    showToast(codes.length + '件を削除しました。');
+  }
+  function showToast(msg){
+    var t = document.getElementById('toast');
+    document.getElementById('toastMsg').textContent = msg;
+    t.classList.add('open');
+    clearTimeout(showToast._timer);
+    showToast._timer = setTimeout(function(){ t.classList.remove('open'); }, 8000);
+  }
+
+  // ---------- custom confirm / prompt modal (replaces window.confirm/prompt) ----------
+  var modalOverlay = document.getElementById('modalOverlay');
+  var modalTitle = document.getElementById('modalTitle');
+  var modalMsg = document.getElementById('modalMsg');
+  var modalInput = document.getElementById('modalInput');
+  var modalOkBtn = document.getElementById('modalOkBtn');
+  var modalCancelBtn = document.getElementById('modalCancelBtn');
+  var modalResolve = null;
+
+  function closeModal(result){
+    modalOverlay.classList.remove('open');
+    var r = modalResolve;
+    modalResolve = null;
+    if(r) r(result);
+  }
+  modalCancelBtn.addEventListener('click', function(){ closeModal(false); });
+  modalOverlay.addEventListener('click', function(e){ if(e.target === modalOverlay) closeModal(false); });
+  modalOkBtn.addEventListener('click', function(){
+    if(modalInput.style.display !== 'none'){ closeModal(modalInput.value); }
+    else { closeModal(true); }
+  });
+
+  function appConfirm(message, title){
+    return new Promise(function(resolve){
+      modalTitle.textContent = title || '確認';
+      modalMsg.textContent = message;
+      modalInput.style.display = 'none';
+      modalOkBtn.textContent = 'OK';
+      modalResolve = resolve;
+      modalOverlay.classList.add('open');
+    });
+  }
+  function appPrompt(message, defaultValue, title){
+    return new Promise(function(resolve){
+      modalTitle.textContent = title || '入力';
+      modalMsg.textContent = message;
+      modalInput.style.display = '';
+      modalInput.value = defaultValue || '';
+      modalOkBtn.textContent = 'OK';
+      modalResolve = function(v){ resolve(v === false ? null : v); };
+      modalOverlay.classList.add('open');
+      setTimeout(function(){ modalInput.focus(); modalInput.select(); }, 30);
+      modalInput.onkeydown = function(e){ if(e.key === 'Enter'){ closeModal(modalInput.value); } };
+    });
+  }
+
+  document.getElementById('toastUndoBtn').addEventListener('click', function(){
+    if(!lastDeleted) return;
+    Object.keys(lastDeleted).forEach(function(c){ data[c] = lastDeleted[c]; });
+    lastDeleted = null;
+    document.getElementById('toast').classList.remove('open');
+    save(); renderAll();
+  });
+
+  // ---------- drawer ----------
+  var drawerCode = null;
+  function openDrawer(code){
+    drawerCode = code;
+    var it = data[code];
+    document.getElementById('dCode').textContent = code;
+    var dLoc = document.getElementById('dLoc');
+    dLoc.innerHTML = '<option value="">未設定</option>';
+    LOCS.forEach(function(l){ var o=document.createElement('option'); o.value=l; o.textContent=l; dLoc.appendChild(o); });
+    if(it.location && LOCS.indexOf(it.location)===-1){ var o=document.createElement('option'); o.value=it.location; o.textContent=it.location; dLoc.appendChild(o); }
+    var custom = document.createElement('option'); custom.value='__custom__'; custom.textContent='その他…'; dLoc.appendChild(custom);
+    dLoc.value = it.location || '';
+
+    document.getElementById('dReshoot').checked = it.needsReshoot;
+    document.getElementById('dDraft').checked = it.draftDone;
+    document.getElementById('dTrefac').checked = it.sellToTrefac;
+
+    refreshDrawerState();
+    document.getElementById('overlay').classList.add('open');
+    document.getElementById('drawer').classList.add('open');
+  }
+  function closeDrawer(){
+    drawerCode = null;
+    document.getElementById('overlay').classList.remove('open');
+    document.getElementById('drawer').classList.remove('open');
+  }
+  function refreshDrawerState(){
+    if(!drawerCode) return;
+    var it = data[drawerCode];
+    var na = computeNextAction(it);
+    document.getElementById('dNextLabel').textContent = na.emoji + ' ' + na.label;
+    document.getElementById('dAdvanceBtn').style.display = na.advanceLabel ? '' : 'none';
+    document.getElementById('dAdvanceBtn').textContent = na.advanceLabel || '';
+
+    setActiveBtn('dPhotoNot', it.photoStatus === 'not_taken');
+    setActiveBtn('dPhotoTaken', it.photoStatus === 'taken');
+    setActiveBtn('dImgWaiting', it.imageStatus === 'waiting');
+    setActiveBtn('dImgProcessing', it.imageStatus === 'processing');
+    setActiveBtn('dImgDone', it.imageStatus === 'done');
+    setActiveBtn('dListingNot', it.listingStatus !== 'listed');
+    setActiveBtn('dListingListed', it.listingStatus === 'listed');
+  }
+  function setActiveBtn(id, on){
+    var el = document.getElementById(id);
+    el.style.background = on ? 'var(--ink)' : '';
+    el.style.color = on ? '#fff' : '';
+    el.style.borderColor = on ? 'var(--ink)' : '';
+  }
+  document.getElementById('drawerCloseBtn').addEventListener('click', closeDrawer);
+  document.getElementById('overlay').addEventListener('click', closeDrawer);
+  document.getElementById('dAdvanceBtn').addEventListener('click', function(){
+    if(!drawerCode) return;
+    advance(data[drawerCode]); save(); renderAll(); refreshDrawerState();
+  });
+  document.getElementById('dLoc').addEventListener('change', function(){
+    if(!drawerCode) return;
+    var v = this.value;
+    var self = this;
+    if(v === '__custom__'){
+      appPrompt('保管場所を入力してください', data[drawerCode].location||'', '保管場所').then(function(nv){
+        if(nv && nv.trim()){ data[drawerCode].location = nv.trim(); }
+        else { self.value = data[drawerCode].location||''; return; }
+        save(); renderAll(); openDrawer(drawerCode);
+      });
+      return;
+    }
+    data[drawerCode].location = v;
+    save(); renderAll(); openDrawer(drawerCode);
+  });
+  document.getElementById('dPhotoNot').addEventListener('click', function(){ if(!drawerCode) return; data[drawerCode].photoStatus='not_taken'; save(); renderAll(); refreshDrawerState(); });
+  document.getElementById('dPhotoTaken').addEventListener('click', function(){ if(!drawerCode) return; data[drawerCode].photoStatus='taken'; save(); renderAll(); refreshDrawerState(); });
+  document.getElementById('dImgWaiting').addEventListener('click', function(){ if(!drawerCode) return; data[drawerCode].imageStatus='waiting'; save(); renderAll(); refreshDrawerState(); });
+  document.getElementById('dImgProcessing').addEventListener('click', function(){ if(!drawerCode) return; data[drawerCode].imageStatus='processing'; save(); renderAll(); refreshDrawerState(); });
+  document.getElementById('dImgDone').addEventListener('click', function(){ if(!drawerCode) return; data[drawerCode].imageStatus='done'; save(); renderAll(); refreshDrawerState(); });
+  document.getElementById('dListingNot').addEventListener('click', function(){ if(!drawerCode) return; data[drawerCode].listingStatus='not_listed'; save(); renderAll(); refreshDrawerState(); });
+  document.getElementById('dListingListed').addEventListener('click', function(){ if(!drawerCode) return; data[drawerCode].listingStatus='listed'; save(); renderAll(); refreshDrawerState(); });
+  document.getElementById('dReshoot').addEventListener('change', function(){ if(!drawerCode) return; data[drawerCode].needsReshoot = this.checked; if(this.checked) data[drawerCode].photoStatus='taken'; save(); renderAll(); refreshDrawerState(); });
+  document.getElementById('dDraft').addEventListener('change', function(){ if(!drawerCode) return; data[drawerCode].draftDone = this.checked; save(); renderAll(); refreshDrawerState(); });
+  document.getElementById('dTrefac').addEventListener('change', function(){ if(!drawerCode) return; data[drawerCode].sellToTrefac = this.checked; save(); renderAll(); refreshDrawerState(); });
+  document.getElementById('dDeleteBtn').addEventListener('click', function(){
+    if(!drawerCode) return;
+    var code = drawerCode;
+    appConfirm(code + ' を削除します。よろしいですか?', '削除の確認').then(function(ok){
+      if(!ok) return;
+      closeDrawer();
+      deleteItems([code]);
+    });
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>

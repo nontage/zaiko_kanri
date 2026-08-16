@@ -48,7 +48,11 @@
   }
   #sidebar .brand{ font-weight: 900; font-size: 16px; padding: 4px 8px 18px; letter-spacing: 0.02em; }
   #sidebar .navgroup{ margin-bottom: 16px; }
-  #sidebar .navgroup .gt{ font-family: var(--mono); font-size: 10px; color: var(--ink-faint); letter-spacing: 0.1em; text-transform: uppercase; padding: 0 8px 6px; }
+  #sidebar .navgroup .gt{
+    font-family: var(--mono); font-size: 10px; color: var(--ink-faint); letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 8px 8px 6px; margin-top: 6px; border-top: 1px solid var(--line-strong);
+    background: var(--paper); cursor: default; pointer-events: none;
+  }
   #sidebar .navitem{
     display:flex; align-items:center; justify-content:space-between; gap:8px;
     padding: 7px 8px; border-radius: var(--radius-sm); font-size: 13px; cursor:pointer; color: var(--ink-soft);
@@ -179,6 +183,11 @@
   .filter-bar textarea{ flex:2; min-width:200px; min-height: 34px; resize: vertical; }
   .filter-bar select{ flex:1; min-width: 130px; }
   .chip-row{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom: 12px; }
+  #activeFilterBanner{
+    display:flex; align-items:center; gap:10px; background: var(--amber-tint); color: var(--amber-ink);
+    border: 1px solid var(--amber); border-radius: var(--radius-sm); padding: 8px 12px; margin-bottom: 12px; font-size: 12.5px;
+  }
+  #activeFilterBanner button{ background: transparent; border: 1px solid var(--amber-ink); color: var(--amber-ink); padding: 3px 10px; font-size: 11.5px; }
   .qchip{ font-size: 11.5px; padding: 5px 11px; border-radius:999px; border:1px solid var(--line-strong); background:var(--panel); cursor:pointer; }
   .qchip.active{ background: var(--ink); color:#fff; border-color: var(--ink); }
   .qchip.tone-coral{ color: var(--coral-ink); border-color: var(--coral); }
@@ -207,7 +216,7 @@
   /* ---- list ---- */
   .board{ border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); overflow:hidden; }
   .empty{ padding: 30px 16px; text-align:center; color: var(--ink-faint); font-size:13px; }
-  .list-head, .item-row{ display:grid; grid-template-columns: 26px 1.1fr 84px 96px 108px 128px 1.3fr 108px 30px; align-items:center; gap:10px; }
+  .list-head, .item-row{ display:grid; grid-template-columns: 26px 1.1fr 100px 1.3fr 108px 108px 30px; align-items:center; gap:10px; }
   .list-head{ font-size: 10.5px; color: var(--ink-faint); letter-spacing:0.04em; padding: 8px 14px; border-bottom: 1px solid var(--line); background: var(--paper); }
   .item-row{ padding: 9px 14px; border-bottom: 1px solid var(--line); }
   .item-row:last-child{ border-bottom:none; }
@@ -338,6 +347,7 @@
           <button class="primary" id="importBtn">取り込む</button>
           <button id="csvImportLabel">CSVファイルを取り込む</button>
           <input type="file" id="csvImportFile" accept=".csv,text/csv" style="display:none;">
+          <button id="csvTemplateBtn">テンプレートCSVをDL</button>
           <button class="danger" id="clearBtn">全て削除</button>
         </div>
 
@@ -347,11 +357,8 @@
             <button class="sm" id="stagingCloseBtn">閉じる</button>
           </div>
           <div class="bulkbar active" id="stagingBar" style="background:var(--ink);">
-            <button data-act="photo_taken">撮影完了</button>
             <button data-act="reshoot">再撮影</button>
-            <button data-act="image_processing">加工開始</button>
-            <button data-act="image_done">加工完了</button>
-            <button data-act="draft_done">下書き完了</button>
+            <button data-act="photographed">撮影完了</button>
             <button data-act="listed">出品完了</button>
             <button data-act="trefac">トレファクへ</button>
             <select id="stagingLocSelect"></select>
@@ -359,32 +366,6 @@
           </div>
           <div id="stagingList" class="board" style="margin-top:8px;"></div>
         </div>
-
-        <details style="margin-top:14px;">
-          <summary style="cursor:pointer; font-size:12px; color:var(--ink-soft);">既存の分類済みリストをまとめて反映</summary>
-          <div style="margin-top:10px;">
-            <div class="row">
-              <select id="bulkCategory">
-                <option value="loc_C1">保管場所: C1</option>
-                <option value="loc_C2">保管場所: C2</option>
-                <option value="loc_C3">保管場所: C3</option>
-                <option value="loc_C4">保管場所: C4</option>
-                <option value="loc_C5">保管場所: C5</option>
-                <option value="loc_H1">保管場所: H1</option>
-                <option value="loc_H2">保管場所: H2</option>
-                <option value="photo_taken">撮影済みにする</option>
-                <option value="photo_not">未撮影にする</option>
-                <option value="image_done">画像を完成にする</option>
-                <option value="draft_done">下書き済みにする</option>
-                <option value="listed">出品済みにする</option>
-                <option value="reshoot">再撮影フラグを立てる</option>
-                <option value="trefac">トレファク行きにする</option>
-              </select>
-            </div>
-            <textarea id="bulkArea" rows="3" placeholder="コードを改行区切りで貼り付け" style="margin-top:8px;"></textarea>
-            <div class="row" style="margin-top:8px;"><button class="primary" id="bulkApplyBtn">反映する</button></div>
-          </div>
-        </details>
       </div>
     </div>
 
@@ -413,14 +394,12 @@
       </select>
     </div>
     <div class="chip-row" id="quickChipRow"></div>
+    <div id="activeFilterBanner" style="display:none;"></div>
 
     <div class="bulkbar" id="bulkbar">
       <span class="count" id="bulkCount">0件選択中</span>
-      <button data-act="photo_taken">撮影完了</button>
       <button data-act="reshoot">再撮影</button>
-      <button data-act="image_processing">加工開始</button>
-      <button data-act="image_done">加工完了</button>
-      <button data-act="draft_done">下書き完了</button>
+      <button data-act="photographed">撮影完了</button>
       <button data-act="listed">出品完了</button>
       <button data-act="trefac">トレファクへ</button>
       <select id="bulkLocSelect"></select>
@@ -433,7 +412,7 @@
 
     <div class="list-head">
       <input type="checkbox" id="selectAllBox">
-      <span>商品</span><span>保管場所</span><span>撮影</span><span>画像</span><span>出品</span><span>次にやること</span><span></span><span></span>
+      <span>商品</span><span>保管場所</span><span>ステータス</span><span>次にやること</span><span></span><span></span>
     </div>
     <div id="itemList" class="board"></div>
 
@@ -473,29 +452,15 @@
     <select id="dLoc"></select>
   </div>
   <div class="dsection">
-    <div class="dlabel">撮影状態</div>
+    <div class="dlabel">ステータス</div>
     <div class="dbtns">
-      <button class="sm" id="dPhotoNot">未撮影</button>
-      <button class="sm" id="dPhotoTaken">撮影済み</button>
+      <button class="sm" id="dStatusReshoot">再撮影</button>
+      <button class="sm" id="dStatusPhotographed">撮影</button>
     </div>
-    <div class="toggle-row"><span>再撮影が必要</span><input type="checkbox" id="dReshoot"></div>
-  </div>
-  <div class="dsection">
-    <div class="dlabel">画像状態</div>
-    <div class="dbtns">
-      <button class="sm" id="dImgWaiting">加工待ち</button>
-      <button class="sm" id="dImgProcessing">加工中</button>
-      <button class="sm" id="dImgDone">完成</button>
+    <div class="dbtns" style="margin-top:6px;">
+      <button class="sm" id="dStatusListed">出品済み</button>
+      <button class="sm" id="dStatusTrefac">トレファク</button>
     </div>
-  </div>
-  <div class="dsection">
-    <div class="dlabel">出品状態</div>
-    <div class="toggle-row"><span>下書き済み</span><input type="checkbox" id="dDraft"></div>
-    <div class="dbtns" style="margin-top:8px;">
-      <button class="sm" id="dListingNot">未出品</button>
-      <button class="sm" id="dListingListed">出品済み</button>
-    </div>
-    <div class="toggle-row"><span>トレファクに売る</span><input type="checkbox" id="dTrefac"></div>
   </div>
   <div class="dsection">
     <button class="danger" id="dDeleteBtn" style="width:100%;">この商品を削除</button>
@@ -555,7 +520,8 @@
 <script>
 (function(){
   var OLD_KEY = 'inventory-tag-data-v1';
-  var NEW_KEY = 'inventory-app-data-v2';
+  var V2_KEY = 'inventory-app-data-v2';
+  var NEW_KEY = 'inventory-app-data-v3';
   var data = {};
   var selected = {};
   var quickFilter = null;
@@ -578,7 +544,7 @@
     clearTimeout(saveTimer);
     saveTimer = setTimeout(function(){ el.textContent = '保存済み'; }, 350);
   }
-  function save(){ repairAll(); saveRaw(); markSaved(); pushToCloud(); }
+  function save(){ saveRaw(); markSaved(); pushToCloud(); }
 
   // ---------- Firebase auth & cloud sync ----------
   var fbAuth = window.__kenpinAuth || null;
@@ -663,61 +629,58 @@
 
   function ensure(code){
     if(!data[code]){
-      data[code] = {
-        code: code, location: '', photoStatus: 'not_taken', needsReshoot: false,
-        imageStatus: 'waiting', draftDone: false, listingStatus: 'not_listed', sellToTrefac: false
-      };
+      data[code] = { code: code, location: '', status: 'reshoot' };
     }
     return data[code];
   }
 
-  function migrateFromOld(){
+  // 旧v1形式(image/listed/sub)から新しい単一ステータスへ変換
+  function statusFromV1(o){
+    if(o.listed === 'yes') return 'listed';
+    if(o.sub === 'trefac') return 'trefac';
+    if(o.image === 'yes') return 'photographed';
+    return 'reshoot';
+  }
+  function migrateFromV1(){
     var raw;
     try{ raw = localStorage.getItem(OLD_KEY); }catch(e){ raw = null; }
-    if(!raw) return;
+    if(!raw) return false;
     var old;
-    try{ old = JSON.parse(raw); }catch(e){ return; }
-    if(!old || typeof old !== 'object') return;
-
+    try{ old = JSON.parse(raw); }catch(e){ return false; }
+    if(!old || typeof old !== 'object') return false;
     try{ localStorage.setItem(OLD_KEY + '-backup-' + Date.now(), raw); }catch(e){}
-
     Object.keys(old).forEach(function(code){
       var o = old[code] || {};
       var it = ensure(code);
-      var wasPhotographed = o.image === 'yes';
-      var wasNoPhoto = o.image === 'no';
-      var locWasNoPhoto = o.loc === '未撮影';
-
-      it.photoStatus = wasPhotographed ? 'taken' : 'not_taken';
-      if(!wasPhotographed && !wasNoPhoto && !locWasNoPhoto && o.loc){
-        it.photoStatus = 'taken'; // has a location but no explicit image flag: assume handled
-      }
       it.location = (o.loc && o.loc !== '未撮影') ? o.loc : '';
-
-      it.needsReshoot = o.sub === 'reshoot';
-      if(o.sub === 'processing'){ it.imageStatus = 'processing'; it.photoStatus = 'taken'; }
-      else if(wasPhotographed){ it.imageStatus = 'done'; }
-      else { it.imageStatus = 'waiting'; }
-
-      it.listingStatus = o.listed === 'yes' ? 'listed' : 'not_listed';
-      it.draftDone = o.listed === 'yes' ? true : false;
-      it.sellToTrefac = o.sub === 'trefac';
-      repairInvariants(it);
+      it.status = statusFromV1(o);
     });
-    save();
+    return true;
   }
 
-  // 出品済み(またはトレファク済み)なら、撮影・画像加工は必ず完了しているはず、という
-  // 整合性を常に強制する。矛盾した表示("出品済なのに未撮影")を防ぐ。
-  function repairInvariants(it){
-    if(it.listingStatus === 'listed' || it.listingStatus === 'trefac_sold'){
-      it.photoStatus = 'taken';
-      it.imageStatus = 'done';
-      it.needsReshoot = false;
-    }
+  // 旧v2形式(photoStatus/needsReshoot/imageStatus/draftDone/listingStatus/sellToTrefac)から
+  // 新しい単一ステータス(reshoot/photographed/listed/trefac)へ変換
+  function statusFromV2(o){
+    if(o.listingStatus === 'listed') return 'listed';
+    if(o.listingStatus === 'trefac_sold' || o.sellToTrefac) return 'trefac';
+    if(o.needsReshoot || o.photoStatus !== 'taken') return 'reshoot';
+    return 'photographed';
   }
-  function repairAll(){
-    Object.keys(data).forEach(function(c){ repairInvariants(data[c]); });
+  function migrateFromV2(){
+    var raw;
+    try{ raw = localStorage.getItem(V2_KEY); }catch(e){ raw = null; }
+    if(!raw) return false;
+    var old;
+    try{ old = JSON.parse(raw); }catch(e){ return false; }
+    if(!old || typeof old !== 'object') return false;
+    try{ localStorage.setItem(V2_KEY + '-backup-' + Date.now(), raw); }catch(e){}
+    Object.keys(old).forEach(function(code){
+      var o = old[code] || {};
+      var it = ensure(code);
+      it.location = o.location || '';
+      it.status = statusFromV2(o);
+    });
+    return true;
   }
 
   function load(){
@@ -725,11 +688,10 @@
     try{ raw = localStorage.getItem(NEW_KEY); }catch(e){ raw = null; }
     if(raw){
       try{ data = JSON.parse(raw); }catch(e){ data = {}; }
-    } else {
-      migrateFromOld();
+    } else if(!migrateFromV2()){
+      migrateFromV1();
     }
     Object.keys(data).forEach(function(c){ ensure(c); }); // fill defaults for any partial records
-    repairAll();
     saveRaw();
     try{
       var stagingRaw = localStorage.getItem(STAGING_KEY);
@@ -739,82 +701,41 @@
   }
 
   // ---------- state machine ----------
+  // status: 'reshoot'(写真なし・撮影が必要) | 'photographed'(写真あり・出品前) | 'listed'(出品済み・完了) | 'trefac'(トレファク行き・完了)
   function computeNextAction(it){
-    if(it.listingStatus === 'listed') return { key:'done', label:'完了', tone:'teal', advanceLabel:null };
-    if(it.listingStatus === 'trefac_sold') return { key:'done', label:'完了(トレファク)', tone:'teal', advanceLabel:null };
-    if(it.needsReshoot) return { key:'reshoot', label:'再撮影する', tone:'coral', advanceLabel:'再撮影完了' };
-    if(it.sellToTrefac) return { key:'trefac', label:'トレファクへ', tone:'slate', advanceLabel:'トレファク完了' };
-    if(it.photoStatus !== 'taken') return { key:'photo', label:'撮影する', tone:'coral', advanceLabel:'撮影完了' };
-    if(it.imageStatus !== 'done') return { key:'image', label:'画像加工する', tone:'amber', advanceLabel:'加工完了' };
-    if(!it.draftDone) return { key:'draft', label:'下書きを書く', tone:'amber', advanceLabel:'下書き完了' };
+    if(it.status === 'listed') return { key:'done', label:'完了', tone:'teal', advanceLabel:null };
+    if(it.status === 'trefac') return { key:'done', label:'完了(トレファク)', tone:'teal', advanceLabel:null };
+    if(it.status === 'reshoot') return { key:'reshoot', label:'撮影する', tone:'coral', advanceLabel:'撮影完了' };
     return { key:'listing', label:'出品する', tone:'teal', advanceLabel:'出品完了' };
   }
 
   function advance(it){
-    var na = computeNextAction(it);
-    switch(na.key){
-      case 'reshoot': it.needsReshoot = false; break;
-      case 'trefac': it.listingStatus = 'trefac_sold'; break;
-      case 'photo': it.photoStatus = 'taken'; break;
-      case 'image': it.imageStatus = 'done'; break;
-      case 'draft': it.draftDone = true; break;
-      case 'listing': it.listingStatus = 'listed'; break;
-      default: break;
-    }
+    if(it.status === 'reshoot') it.status = 'photographed';
+    else if(it.status === 'photographed') it.status = 'listed';
   }
 
-  function photoBadge(it){
-    if(it.needsReshoot) return { label:'撮影:再撮影', tone:'coral' };
-    if(it.photoStatus === 'taken') return { label:'撮影:済', tone:'teal' };
-    return { label:'撮影:未', tone:'slate' };
-  }
-  function imageBadge(it){
-    if(it.photoStatus !== 'taken') return { label:'画像:なし', tone:'slate' };
-    if(it.imageStatus === 'done') return { label:'画像:完成', tone:'teal' };
-    if(it.imageStatus === 'processing') return { label:'画像:加工中', tone:'amber' };
-    return { label:'画像:加工待ち', tone:'slate' };
-  }
-  function listingBadge(it){
-    if(it.listingStatus === 'listed') return { label:'出品:済', tone:'teal' };
-    if(it.listingStatus === 'trefac_sold') return { label:'出品:トレファク済', tone:'amber' };
-    if(it.draftDone) return { label:'出品:下書き済', tone:'amber' };
-    if(it.photoStatus === 'taken' && it.imageStatus === 'done') return { label:'出品:下書き待ち', tone:'slate' };
-    return { label:'出品:未', tone:'slate' };
+  function statusBadge(it){
+    switch(it.status){
+      case 'reshoot': return { label:'再撮影', tone:'coral' };
+      case 'photographed': return { label:'撮影', tone:'amber' };
+      case 'listed': return { label:'出品済み', tone:'teal' };
+      case 'trefac': return { label:'トレファク', tone:'slate' };
+      default: return { label:'再撮影', tone:'coral' };
+    }
   }
 
   function matchesQuick(it, key){
     if(!key) return true;
-    switch(key){
-      case 'not_photo': return it.photoStatus !== 'taken' && !it.needsReshoot;
-      case 'reshoot': return it.needsReshoot;
-      case 'img_waiting': return it.photoStatus === 'taken' && !it.needsReshoot && it.imageStatus === 'waiting';
-      case 'img_processing': return it.imageStatus === 'processing';
-      case 'img_pending': return it.photoStatus === 'taken' && !it.needsReshoot && it.imageStatus !== 'done';
-      case 'draft_pending': return it.photoStatus === 'taken' && !it.needsReshoot && it.imageStatus === 'done' && !it.draftDone && it.listingStatus === 'not_listed';
-      case 'listing_pending': return it.draftDone && it.listingStatus === 'not_listed' && !it.needsReshoot;
-      case 'listed': return it.listingStatus === 'listed';
-      case 'not_listed': return it.listingStatus === 'not_listed';
-      case 'trefac_pending': return it.sellToTrefac && it.listingStatus !== 'trefac_sold';
-      default: return true;
-    }
+    return it.status === key;
   }
 
   function computeCounts(){
     var codes = Object.keys(data);
-    var c = { total: codes.length, not_photo:0, reshoot:0, img_waiting:0, img_processing:0, img_pending:0, draft_pending:0, listing_pending:0, listed:0, not_listed:0, trefac_pending:0, byLoc:{} };
+    var c = { total: codes.length, reshoot:0, photographed:0, listed:0, trefac:0, byLoc:{} };
     LOCS.forEach(function(l){ c.byLoc[l] = 0; });
     codes.forEach(function(code){
       var it = data[code];
-      if(matchesQuick(it,'not_photo')) c.not_photo++;
-      if(matchesQuick(it,'reshoot')) c.reshoot++;
-      if(matchesQuick(it,'img_waiting')) c.img_waiting++;
-      if(matchesQuick(it,'img_processing')) c.img_processing++;
-      if(matchesQuick(it,'img_pending')) c.img_pending++;
-      if(matchesQuick(it,'draft_pending')) c.draft_pending++;
-      if(matchesQuick(it,'listing_pending')) c.listing_pending++;
-      if(matchesQuick(it,'listed')) c.listed++;
-      if(matchesQuick(it,'not_listed')) c.not_listed++;
-      if(matchesQuick(it,'trefac_pending')) c.trefac_pending++;
+      if(c[it.status] !== undefined) c[it.status]++;
       if(it.location && c.byLoc[it.location] !== undefined) c.byLoc[it.location]++;
       else if(it.location){ c.byLoc[it.location] = (c.byLoc[it.location]||0) + 1; }
     });
@@ -830,7 +751,7 @@
     }
   }
 
-  var NEXT_ORDER = { reshoot:0, photo:1, image:2, draft:3, listing:4, trefac:5, done:6 };
+  var NEXT_ORDER = { reshoot:0, listing:1, done:2 };
   function getVisibleCodes(){
     var codes = Object.keys(data).sort();
     var searchTerms = document.getElementById('searchBox').value.split(/[,\s]+/).map(function(s){ return s.trim().toLowerCase(); }).filter(Boolean);
@@ -863,21 +784,16 @@
 
   // ---------- rendering ----------
   var STAGE_ORDER = [
-    { key:'photo', qkey:'not_photo', label:'未撮影', tone:'coral' },
     { key:'reshoot', qkey:'reshoot', label:'再撮影', tone:'coral' },
-    { key:'image', qkey:'img_pending', label:'画像加工', tone:'amber' },
-    { key:'draft', qkey:'draft_pending', label:'下書き', tone:'amber' },
-    { key:'listing', qkey:'listing_pending', label:'出品待ち', tone:'teal' },
-    { key:'trefac', qkey:'trefac_pending', label:'トレファク行き', tone:'slate' },
-    { key:'done', qkey:'listed', label:'出品済み', tone:'teal' }
+    { key:'photographed', qkey:'photographed', label:'撮影(出品前)', tone:'amber' },
+    { key:'listed', qkey:'listed', label:'出品済み', tone:'teal' },
+    { key:'trefac', qkey:'trefac', label:'トレファク', tone:'slate' }
   ];
   var TODAY_CATS = [
-    { key:'not_photo', label:'撮影', tone:'coral' },
     { key:'reshoot', label:'再撮影', tone:'coral' },
-    { key:'img_pending', label:'画像加工', tone:'amber' },
-    { key:'draft_pending', label:'下書き', tone:'amber' },
-    { key:'listing_pending', label:'出品', tone:'teal' },
-    { key:'trefac_pending', label:'トレファク', tone:'slate' }
+    { key:'photographed', label:'撮影(出品待ち)', tone:'amber' },
+    { key:'listed', label:'出品済み', tone:'teal' },
+    { key:'trefac', label:'トレファク', tone:'slate' }
   ];
   var QUICK_CHIPS = TODAY_CATS;
 
@@ -904,11 +820,11 @@
   }
 
   function computeStageBuckets(){
-    var buckets = { photo:0, reshoot:0, image:0, draft:0, listing:0, trefac:0, done:0 };
+    var buckets = { reshoot:0, photographed:0, listed:0, trefac:0 };
     Object.keys(data).forEach(function(code){
-      var key = computeNextAction(data[code]).key;
-      if(buckets[key] === undefined) key = 'done';
-      buckets[key]++;
+      var st = data[code].status;
+      if(buckets[st] === undefined) st = 'reshoot';
+      buckets[st]++;
     });
     return buckets;
   }
@@ -924,7 +840,7 @@
     totalWrap.innerHTML = '<span class="n">' + total + '</span><span class="l">総在庫</span>';
     top.appendChild(totalWrap);
     var sub = document.createElement('div'); sub.className = 'hero-sub';
-    sub.textContent = total > 0 ? Math.round((buckets.done / total) * 100) + '% 出品完了' : '';
+    sub.textContent = total > 0 ? Math.round(((buckets.listed + buckets.trefac) / total) * 100) + '% 完了' : '';
     top.appendChild(sub);
     hero.appendChild(top);
 
@@ -1018,6 +934,24 @@
 
     document.getElementById('listTitle').textContent = '在庫一覧';
 
+    var banner = document.getElementById('activeFilterBanner');
+    var activeLabels = [];
+    if(quickFilter){
+      var cat = TODAY_CATS.filter(function(t){ return t.key === quickFilter; })[0];
+      if(cat) activeLabels.push('ステータス: ' + cat.label);
+    }
+    if(locFilter !== 'all'){ activeLabels.push('保管場所: ' + locFilter); }
+    if(activeLabels.length){
+      banner.style.display = 'flex';
+      banner.innerHTML = '<span>絞り込み中 — ' + activeLabels.join(' / ') + '</span><button id="clearFilterBtn">✕ 解除</button>';
+      document.getElementById('clearFilterBtn').addEventListener('click', function(){
+        quickFilter = null; locFilter = 'all'; renderAll();
+      });
+    } else {
+      banner.style.display = 'none';
+      banner.innerHTML = '';
+    }
+
     if(visible.length === 0){
       var empty = document.createElement('div');
       empty.className = 'empty';
@@ -1032,7 +966,7 @@
     visible.forEach(function(code){
       var it = data[code];
       var na = computeNextAction(it);
-      var pb = photoBadge(it), ib = imageBadge(it), lb = listingBadge(it);
+      var sb = statusBadge(it);
 
       // desktop row
       var row = document.createElement('div');
@@ -1052,9 +986,7 @@
       locEl.className = 'loc'; locEl.textContent = it.location || '—';
       row.appendChild(locEl);
 
-      var pWrap = document.createElement('span'); pWrap.innerHTML = badgeHtml(pb); row.appendChild(pWrap);
-      var iWrap = document.createElement('span'); iWrap.innerHTML = badgeHtml(ib); row.appendChild(iWrap);
-      var lWrap = document.createElement('span'); lWrap.innerHTML = badgeHtml(lb); row.appendChild(lWrap);
+      var sWrap = document.createElement('span'); sWrap.innerHTML = badgeHtml(sb); row.appendChild(sWrap);
 
       var naEl = document.createElement('div');
       naEl.className = 'next-action tone-' + na.tone + (na.key === 'done' ? ' done' : '');
@@ -1100,7 +1032,7 @@
       card.appendChild(top);
 
       var badges = document.createElement('div'); badges.className = 'badges';
-      badges.innerHTML = badgeHtml(pb) + badgeHtml(ib) + badgeHtml(lb);
+      badges.innerHTML = badgeHtml(sb);
       card.appendChild(badges);
 
       var bottom = document.createElement('div'); bottom.className = 'bottom';
@@ -1142,10 +1074,10 @@
       var it = data[code];
       if(!it) return;
       var na = computeNextAction(it);
-      var pb = photoBadge(it), ib = imageBadge(it), lb = listingBadge(it);
+      var sb = statusBadge(it);
       var row = document.createElement('div');
       row.className = 'item-row';
-      row.style.gridTemplateColumns = '1.1fr 84px 96px 108px 108px 1fr';
+      row.style.gridTemplateColumns = '1.1fr 84px 108px 1fr';
 
       var codeEl = document.createElement('span'); codeEl.className='code'; codeEl.textContent = code;
       codeEl.addEventListener('click', function(){ openDrawer(code); });
@@ -1154,9 +1086,7 @@
       var locEl = document.createElement('span'); locEl.className='loc'; locEl.textContent = it.location || '—';
       row.appendChild(locEl);
 
-      var pWrap = document.createElement('span'); pWrap.innerHTML = badgeHtml(pb); row.appendChild(pWrap);
-      var iWrap = document.createElement('span'); iWrap.innerHTML = badgeHtml(ib); row.appendChild(iWrap);
-      var lWrap = document.createElement('span'); lWrap.innerHTML = badgeHtml(lb); row.appendChild(lWrap);
+      var sWrap = document.createElement('span'); sWrap.innerHTML = badgeHtml(sb); row.appendChild(sWrap);
 
       var naEl = document.createElement('div');
       naEl.className = 'next-action tone-' + na.tone + (na.key === 'done' ? ' done' : '');
@@ -1177,13 +1107,7 @@
     var act = btn.getAttribute('data-act');
     stagingCodes.forEach(function(code){
       var it = ensure(code);
-      if(act === 'photo_taken') it.photoStatus = 'taken';
-      else if(act === 'reshoot'){ it.needsReshoot = true; it.photoStatus = 'taken'; }
-      else if(act === 'image_processing'){ it.photoStatus='taken'; it.imageStatus = 'processing'; }
-      else if(act === 'image_done'){ it.photoStatus='taken'; it.imageStatus = 'done'; }
-      else if(act === 'draft_done') it.draftDone = true;
-      else if(act === 'listed') it.listingStatus = 'listed';
-      else if(act === 'trefac') it.sellToTrefac = true;
+      if(act === 'reshoot' || act === 'photographed' || act === 'listed' || act === 'trefac') it.status = act;
     });
     save(); renderAll(); renderStaging();
   });
@@ -1223,7 +1147,7 @@
     document.getElementById('locSection').style.display = showDash ? '' : 'none';
     document.getElementById('backupSection').style.display = showBackup ? '' : 'none';
     if(showBackup){ document.getElementById('backupSection').scrollIntoView({behavior:'smooth'}); }
-    if(view === 'all'){ quickFilter = null; }
+    if(view === 'all' || view === 'register' || view === 'backup'){ quickFilter = null; locFilter = 'all'; }
     renderAll();
   }
   document.querySelectorAll('[data-nav]').forEach(function(el){
@@ -1256,26 +1180,6 @@
     });
   });
 
-  function applyCategoryToCode(code, cat){
-    var it = ensure(code);
-    if(cat.indexOf('loc_') === 0) it.location = cat.replace('loc_','');
-    else if(cat === 'photo_taken') it.photoStatus = 'taken';
-    else if(cat === 'photo_not') it.photoStatus = 'not_taken';
-    else if(cat === 'image_done'){ it.photoStatus='taken'; it.imageStatus = 'done'; }
-    else if(cat === 'draft_done'){ it.draftDone = true; }
-    else if(cat === 'listed'){ it.listingStatus = 'listed'; }
-    else if(cat === 'reshoot'){ it.needsReshoot = true; it.photoStatus='taken'; }
-    else if(cat === 'trefac'){ it.sellToTrefac = true; }
-  }
-  document.getElementById('bulkApplyBtn').addEventListener('click', function(){
-    var cat = document.getElementById('bulkCategory').value;
-    var raw = document.getElementById('bulkArea').value;
-    var codes = raw.split(/[\n,\s]+/).map(function(s){ return s.trim(); }).filter(Boolean);
-    codes.forEach(function(c){ applyCategoryToCode(c, cat); });
-    document.getElementById('bulkArea').value = '';
-    save(); renderAll();
-  });
-
   // ---------- CSV import ----------
   function parseCSV(text){
     var rows = []; var row = []; var field = ''; var inQuotes = false;
@@ -1300,25 +1204,28 @@
     if(!code || code === 'コード') return false;
     var it = ensure(code);
     var locVal = (cols[1]||'').trim();
-    var photoVal = (cols[2]||'').trim();
-    var imgVal = (cols[3]||'').trim();
-    var listVal = (cols[4]||'').trim();
-    var reshootVal = (cols[5]||'').trim();
-    var trefacVal = (cols[6]||'').trim();
+    var statusVal = (cols[2]||'').trim();
     if(locVal) it.location = locVal;
-    if(photoVal === '撮影済み') it.photoStatus = 'taken';
-    else if(photoVal === '未撮影') it.photoStatus = 'not_taken';
-    if(imgVal === '完成') it.imageStatus = 'done';
-    else if(imgVal === '加工中') it.imageStatus = 'processing';
-    else if(imgVal === '加工待ち') it.imageStatus = 'waiting';
-    if(listVal === '出品済み') it.listingStatus = 'listed';
-    else if(listVal === 'トレファク済み') it.listingStatus = 'trefac_sold';
-    else if(listVal === '未出品') it.listingStatus = 'not_listed';
-    if(reshootVal === '要') it.needsReshoot = true;
-    if(trefacVal === '要') it.sellToTrefac = true;
+    if(statusVal === '再撮影') it.status = 'reshoot';
+    else if(statusVal === '撮影') it.status = 'photographed';
+    else if(statusVal === '出品済み') it.status = 'listed';
+    else if(statusVal === 'トレファク') it.status = 'trefac';
     return true;
   }
   document.getElementById('csvImportLabel').addEventListener('click', function(){ document.getElementById('csvImportFile').click(); });
+  document.getElementById('csvTemplateBtn').addEventListener('click', function(){
+    var header = ['コード','保管場所','ステータス'];
+    var sample = [
+      ['to3966','C1','出品済み'],
+      ['to4123','C2','再撮影'],
+      ['bt1272','C3','撮影']
+    ];
+    var rows = [header].concat(sample);
+    var csv = rows.map(function(r){
+      return r.map(function(v){ return '"' + String(v).replace(/"/g,'""') + '"'; }).join(',');
+    }).join('\r\n');
+    downloadFile('kenpin-daicho-template.csv', '\uFEFF' + csv, 'text/csv');
+  });
   document.getElementById('csvImportFile').addEventListener('change', function(e){
     var file = e.target.files[0]; if(!file) return;
     var reader = new FileReader();
@@ -1347,17 +1254,10 @@
     URL.revokeObjectURL(url);
   }
   function fullRows(codes){
-    var rows = [['コード','保管場所','撮影状態','画像状態','出品状態','再撮影','トレファク']];
+    var rows = [['コード','保管場所','ステータス']];
     codes.forEach(function(c){
       var it = data[c];
-      rows.push([
-        c, it.location || '',
-        it.photoStatus==='taken' ? '撮影済み' : '未撮影',
-        it.imageStatus==='done'?'完成':(it.imageStatus==='processing'?'加工中':'加工待ち'),
-        it.listingStatus==='listed'?'出品済み':(it.listingStatus==='trefac_sold'?'トレファク済み':'未出品'),
-        it.needsReshoot?'要':'',
-        it.sellToTrefac?'要':''
-      ]);
+      rows.push([ c, it.location || '', statusBadge(it).label ]);
     });
     return rows;
   }
@@ -1395,13 +1295,7 @@
     var act = btn.getAttribute('data-act');
     Object.keys(selected).forEach(function(code){
       var it = ensure(code);
-      if(act === 'photo_taken') it.photoStatus = 'taken';
-      else if(act === 'reshoot'){ it.needsReshoot = true; it.photoStatus = 'taken'; }
-      else if(act === 'image_processing'){ it.photoStatus='taken'; it.imageStatus = 'processing'; }
-      else if(act === 'image_done'){ it.photoStatus='taken'; it.imageStatus = 'done'; }
-      else if(act === 'draft_done') it.draftDone = true;
-      else if(act === 'listed') it.listingStatus = 'listed';
-      else if(act === 'trefac') it.sellToTrefac = true;
+      if(act === 'reshoot' || act === 'photographed' || act === 'listed' || act === 'trefac') it.status = act;
     });
     save(); renderAll();
   });
@@ -1514,10 +1408,6 @@
     var custom = document.createElement('option'); custom.value='__custom__'; custom.textContent='その他…'; dLoc.appendChild(custom);
     dLoc.value = it.location || '';
 
-    document.getElementById('dReshoot').checked = it.needsReshoot;
-    document.getElementById('dDraft').checked = it.draftDone;
-    document.getElementById('dTrefac').checked = it.sellToTrefac;
-
     refreshDrawerState();
     document.getElementById('overlay').classList.add('open');
     document.getElementById('drawer').classList.add('open');
@@ -1535,13 +1425,10 @@
     document.getElementById('dAdvanceBtn').style.display = na.advanceLabel ? '' : 'none';
     document.getElementById('dAdvanceBtn').textContent = na.advanceLabel || '';
 
-    setActiveBtn('dPhotoNot', it.photoStatus === 'not_taken');
-    setActiveBtn('dPhotoTaken', it.photoStatus === 'taken');
-    setActiveBtn('dImgWaiting', it.imageStatus === 'waiting');
-    setActiveBtn('dImgProcessing', it.imageStatus === 'processing');
-    setActiveBtn('dImgDone', it.imageStatus === 'done');
-    setActiveBtn('dListingNot', it.listingStatus !== 'listed');
-    setActiveBtn('dListingListed', it.listingStatus === 'listed');
+    setActiveBtn('dStatusReshoot', it.status === 'reshoot');
+    setActiveBtn('dStatusPhotographed', it.status === 'photographed');
+    setActiveBtn('dStatusListed', it.status === 'listed');
+    setActiveBtn('dStatusTrefac', it.status === 'trefac');
   }
   function setActiveBtn(id, on){
     var el = document.getElementById(id);
@@ -1570,16 +1457,10 @@
     data[drawerCode].location = v;
     save(); renderAll(); openDrawer(drawerCode);
   });
-  document.getElementById('dPhotoNot').addEventListener('click', function(){ if(!drawerCode) return; data[drawerCode].photoStatus='not_taken'; save(); renderAll(); refreshDrawerState(); });
-  document.getElementById('dPhotoTaken').addEventListener('click', function(){ if(!drawerCode) return; data[drawerCode].photoStatus='taken'; save(); renderAll(); refreshDrawerState(); });
-  document.getElementById('dImgWaiting').addEventListener('click', function(){ if(!drawerCode) return; data[drawerCode].imageStatus='waiting'; save(); renderAll(); refreshDrawerState(); });
-  document.getElementById('dImgProcessing').addEventListener('click', function(){ if(!drawerCode) return; data[drawerCode].imageStatus='processing'; save(); renderAll(); refreshDrawerState(); });
-  document.getElementById('dImgDone').addEventListener('click', function(){ if(!drawerCode) return; data[drawerCode].imageStatus='done'; save(); renderAll(); refreshDrawerState(); });
-  document.getElementById('dListingNot').addEventListener('click', function(){ if(!drawerCode) return; data[drawerCode].listingStatus='not_listed'; save(); renderAll(); refreshDrawerState(); });
-  document.getElementById('dListingListed').addEventListener('click', function(){ if(!drawerCode) return; data[drawerCode].listingStatus='listed'; save(); renderAll(); refreshDrawerState(); });
-  document.getElementById('dReshoot').addEventListener('change', function(){ if(!drawerCode) return; data[drawerCode].needsReshoot = this.checked; if(this.checked) data[drawerCode].photoStatus='taken'; save(); renderAll(); refreshDrawerState(); });
-  document.getElementById('dDraft').addEventListener('change', function(){ if(!drawerCode) return; data[drawerCode].draftDone = this.checked; save(); renderAll(); refreshDrawerState(); });
-  document.getElementById('dTrefac').addEventListener('change', function(){ if(!drawerCode) return; data[drawerCode].sellToTrefac = this.checked; save(); renderAll(); refreshDrawerState(); });
+  document.getElementById('dStatusReshoot').addEventListener('click', function(){ if(!drawerCode) return; data[drawerCode].status='reshoot'; save(); renderAll(); refreshDrawerState(); });
+  document.getElementById('dStatusPhotographed').addEventListener('click', function(){ if(!drawerCode) return; data[drawerCode].status='photographed'; save(); renderAll(); refreshDrawerState(); });
+  document.getElementById('dStatusListed').addEventListener('click', function(){ if(!drawerCode) return; data[drawerCode].status='listed'; save(); renderAll(); refreshDrawerState(); });
+  document.getElementById('dStatusTrefac').addEventListener('click', function(){ if(!drawerCode) return; data[drawerCode].status='trefac'; save(); renderAll(); refreshDrawerState(); });
   document.getElementById('dDeleteBtn').addEventListener('click', function(){
     if(!drawerCode) return;
     var code = drawerCode;

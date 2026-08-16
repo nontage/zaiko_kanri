@@ -279,7 +279,7 @@
     <div class="navgroup">
       <div class="navitem" data-nav="dashboard">ダッシュボード</div>
       <div class="navitem" data-nav="all">すべての商品</div>
-      <div class="navitem" data-nav="today">今日やること</div>
+      <div class="navitem" data-nav="today">ステータス</div>
       <div class="navitem" data-nav="locations">保管場所</div>
     </div>
     <div class="navgroup">
@@ -319,6 +319,26 @@
           <input type="file" id="csvImportFile" accept=".csv,text/csv" style="display:none;">
           <button class="danger" id="clearBtn">全て削除</button>
         </div>
+
+        <div id="stagingArea" style="display:none; margin-top:16px; border-top:1px solid var(--line); padding-top:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="font-size:12.5px; font-weight:700;">たった今追加した商品(<span id="stagingCount">0</span>件) <span style="font-weight:400; color:var(--ink-soft); font-size:11.5px;">— この商品だけにボタンで状態を設定できます</span></span>
+            <button class="sm" id="stagingCloseBtn">閉じる</button>
+          </div>
+          <div class="bulkbar active" id="stagingBar" style="background:var(--ink);">
+            <button data-act="photo_taken">撮影完了</button>
+            <button data-act="reshoot">再撮影</button>
+            <button data-act="image_processing">加工開始</button>
+            <button data-act="image_done">加工完了</button>
+            <button data-act="draft_done">下書き完了</button>
+            <button data-act="listed">出品完了</button>
+            <button data-act="trefac">トレファクへ</button>
+            <select id="stagingLocSelect"></select>
+            <button id="stagingLocApply">場所を適用</button>
+          </div>
+          <div id="stagingList" class="board" style="margin-top:8px;"></div>
+        </div>
+
         <details style="margin-top:14px;">
           <summary style="cursor:pointer; font-size:12px; color:var(--ink-soft);">既存の分類済みリストをまとめて反映</summary>
           <div style="margin-top:10px;">
@@ -353,7 +373,7 @@
     </div>
 
     <div id="todaySection">
-      <p class="section-title">今日やること <span class="muted">クリックで絞り込み</span></p>
+      <p class="section-title">ステータス <span class="muted">クリックで絞り込み</span></p>
       <div class="today-row" id="todayRow"></div>
     </div>
 
@@ -433,7 +453,7 @@
 <div id="bottomnav">
   <button data-nav="dashboard">ダッシュボード</button>
   <button data-nav="all">商品</button>
-  <button data-nav="today">今日</button>
+  <button data-nav="today">ステータス</button>
   <button data-nav="locations">場所</button>
 </div>
 
@@ -538,6 +558,7 @@
   var quickFilter = null;
   var currentView = 'dashboard';
   var lastDeleted = null;
+  var stagingCodes = [];
   var saveTimer = null;
 
   var LOCS = ['C1','C2','C3','C4','C5','H1','H2'];
@@ -763,6 +784,7 @@
       case 'draft_pending': return it.photoStatus === 'taken' && !it.needsReshoot && it.imageStatus === 'done' && !it.draftDone && it.listingStatus === 'not_listed';
       case 'listing_pending': return it.draftDone && it.listingStatus === 'not_listed' && !it.needsReshoot;
       case 'listed': return it.listingStatus === 'listed';
+      case 'not_listed': return it.listingStatus === 'not_listed';
       case 'trefac_pending': return it.sellToTrefac && it.listingStatus !== 'trefac_sold';
       default: return true;
     }
@@ -770,7 +792,7 @@
 
   function computeCounts(){
     var codes = Object.keys(data);
-    var c = { total: codes.length, not_photo:0, reshoot:0, img_waiting:0, img_processing:0, img_pending:0, draft_pending:0, listing_pending:0, listed:0, trefac_pending:0, byLoc:{} };
+    var c = { total: codes.length, not_photo:0, reshoot:0, img_waiting:0, img_processing:0, img_pending:0, draft_pending:0, listing_pending:0, listed:0, not_listed:0, trefac_pending:0, byLoc:{} };
     LOCS.forEach(function(l){ c.byLoc[l] = 0; });
     codes.forEach(function(code){
       var it = data[code];
@@ -782,6 +804,7 @@
       if(matchesQuick(it,'draft_pending')) c.draft_pending++;
       if(matchesQuick(it,'listing_pending')) c.listing_pending++;
       if(matchesQuick(it,'listed')) c.listed++;
+      if(matchesQuick(it,'not_listed')) c.not_listed++;
       if(matchesQuick(it,'trefac_pending')) c.trefac_pending++;
       if(it.location && c.byLoc[it.location] !== undefined) c.byLoc[it.location]++;
       else if(it.location){ c.byLoc[it.location] = (c.byLoc[it.location]||0) + 1; }
@@ -842,10 +865,7 @@
     { key:null, label:'総在庫', metric:function(c){ return c.total; } },
     { key:'not_photo', label:'未撮影', metric:function(c){ return c.not_photo; } },
     { key:'reshoot', label:'再撮影', metric:function(c){ return c.reshoot; } },
-    { key:'img_waiting', label:'画像加工待ち', metric:function(c){ return c.img_waiting; } },
-    { key:'img_processing', label:'画像加工中', metric:function(c){ return c.img_processing; } },
-    { key:'draft_pending', label:'下書き待ち', metric:function(c){ return c.draft_pending; } },
-    { key:'listing_pending', label:'出品待ち', metric:function(c){ return c.listing_pending; } },
+    { key:'not_listed', label:'未出品', metric:function(c){ return c.not_listed; } },
     { key:'listed', label:'出品済み', metric:function(c){ return c.listed; } },
     { key:'trefac_pending', label:'トレファク行き', metric:function(c){ return c.trefac_pending; } }
   ];
@@ -945,7 +965,7 @@
     listEl.innerHTML = '';
 
     document.getElementById('listTitle').textContent =
-      currentView === 'today' ? '今日やること — 対象商品' :
+      currentView === 'today' ? 'ステータス — 対象商品' :
       currentView === 'locations' ? '保管場所別 — 対象商品' :
       'すべての商品';
 
@@ -1059,6 +1079,71 @@
     document.getElementById('bulkCount').textContent = n + '件選択中';
   }
 
+  function renderStaging(){
+    stagingCodes = stagingCodes.filter(function(c){ return !!data[c]; });
+    var area = document.getElementById('stagingArea');
+    if(stagingCodes.length === 0){ area.style.display = 'none'; return; }
+    area.style.display = '';
+    document.getElementById('stagingCount').textContent = stagingCodes.length;
+
+    var listEl = document.getElementById('stagingList');
+    listEl.innerHTML = '';
+    stagingCodes.forEach(function(code){
+      var it = data[code];
+      if(!it) return;
+      var na = computeNextAction(it);
+      var pb = photoBadge(it), ib = imageBadge(it), lb = listingBadge(it);
+      var row = document.createElement('div');
+      row.className = 'item-row';
+      row.style.gridTemplateColumns = '1.1fr 84px 96px 108px 108px 1fr';
+
+      var codeEl = document.createElement('span'); codeEl.className='code'; codeEl.textContent = code;
+      codeEl.addEventListener('click', function(){ openDrawer(code); });
+      row.appendChild(codeEl);
+
+      var locEl = document.createElement('span'); locEl.className='loc'; locEl.textContent = it.location || '—';
+      row.appendChild(locEl);
+
+      var pWrap = document.createElement('span'); pWrap.innerHTML = badgeHtml(pb); row.appendChild(pWrap);
+      var iWrap = document.createElement('span'); iWrap.innerHTML = badgeHtml(ib); row.appendChild(iWrap);
+      var lWrap = document.createElement('span'); lWrap.innerHTML = badgeHtml(lb); row.appendChild(lWrap);
+
+      var naEl = document.createElement('div');
+      naEl.className = 'next-action tone-' + na.tone + (na.key === 'done' ? ' done' : '');
+      naEl.textContent = na.label;
+      row.appendChild(naEl);
+
+      listEl.appendChild(row);
+    });
+  }
+  document.getElementById('stagingCloseBtn').addEventListener('click', function(){
+    stagingCodes = [];
+    renderStaging();
+  });
+  document.getElementById('stagingBar').addEventListener('click', function(e){
+    var btn = e.target.closest('button[data-act]');
+    if(!btn) return;
+    var act = btn.getAttribute('data-act');
+    stagingCodes.forEach(function(code){
+      var it = ensure(code);
+      if(act === 'photo_taken') it.photoStatus = 'taken';
+      else if(act === 'reshoot'){ it.needsReshoot = true; it.photoStatus = 'taken'; }
+      else if(act === 'image_processing'){ it.photoStatus='taken'; it.imageStatus = 'processing'; }
+      else if(act === 'image_done'){ it.photoStatus='taken'; it.imageStatus = 'done'; }
+      else if(act === 'draft_done') it.draftDone = true;
+      else if(act === 'listed') it.listingStatus = 'listed';
+      else if(act === 'trefac') it.sellToTrefac = true;
+    });
+    save(); renderAll(); renderStaging();
+  });
+  var stagingLocSelect = document.getElementById('stagingLocSelect');
+  LOCS.forEach(function(l){ var o=document.createElement('option'); o.value=l; o.textContent=l; stagingLocSelect.appendChild(o); });
+  document.getElementById('stagingLocApply').addEventListener('click', function(){
+    var v = stagingLocSelect.value;
+    stagingCodes.forEach(function(code){ ensure(code).location = v; });
+    save(); renderAll(); renderStaging();
+  });
+
   document.getElementById('selectAllBox').addEventListener('change', function(e){
     var visible = getVisibleCodes();
     if(e.target.checked) visible.forEach(function(c){ selected[c] = true; });
@@ -1072,6 +1157,7 @@
     renderSidebarCounts(c);
     renderDash(c);
     renderList();
+    renderStaging();
   }
 
   // ---------- view switching ----------
@@ -1106,7 +1192,8 @@
     var codes = raw.split(/[\n,\s]+/).map(function(s){ return s.trim(); }).filter(Boolean);
     codes.forEach(function(c){ ensure(c); });
     document.getElementById('importArea').value = '';
-    save(); renderAll();
+    stagingCodes = codes.slice();
+    save(); renderAll(); renderStaging();
   });
   document.getElementById('clearBtn').addEventListener('click', function(){
     appConfirm('全ての商品データを削除します。よろしいですか?', '全件削除').then(function(ok){
@@ -1184,8 +1271,10 @@
     reader.onload = function(ev){
       var rows = parseCSV(ev.target.result);
       var count = 0;
-      rows.forEach(function(r){ if(applyCsvRow(r)) count++; });
-      save(); renderAll();
+      var newCodes = [];
+      rows.forEach(function(r){ if(applyCsvRow(r)){ count++; newCodes.push((r[0]||'').trim()); } });
+      stagingCodes = newCodes;
+      save(); renderAll(); renderStaging();
       document.getElementById('backupNote').textContent = 'CSVから' + count + '件を取り込みました。';
     };
     reader.readAsText(file, 'UTF-8');
